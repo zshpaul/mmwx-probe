@@ -1,10 +1,12 @@
-const CACHE_NAME = "mmwx-probe-pwa-v2";
+const CACHE_NAME = "mmwx-probe-pwa-v3";
 const APP_SHELL = [
   "/",
-  "/manifest.webmanifest?v=2",
+  "/manifest.json",
   "/favicon.svg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/icons/maskable-icon-192.png",
+  "/icons/maskable-icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
 
