@@ -1291,15 +1291,23 @@ function MetricBar({
   label,
   value,
   percent,
+  detail,
 }: {
   label: string;
   value: string;
   percent?: number;
+  detail?: string;
 }) {
   return (
-    <div className="premium-probe-resource">
+    <div
+      className={cn(
+        "premium-probe-resource",
+        detail !== undefined && "has-detail",
+      )}
+    >
       <span>{label}</span>
       <strong>{value}</strong>
+      {detail !== undefined && <small>{detail}</small>}
       <i>
         <b style={{ width: `${percent ?? 0}%` }} />
       </i>
@@ -2572,11 +2580,21 @@ function PremiumServerCard({
           label="内存"
           value={mem === undefined ? "—" : `${mem.toFixed(0)}%`}
           percent={mem}
+          detail={
+            server.mem_used === undefined || !server.mem_total
+              ? "—"
+              : `${formatTrafficCompact(server.mem_used)} / ${formatTrafficCompact(server.mem_total)}`
+          }
         />
         <MetricBar
           label="硬盘"
           value={disk === undefined ? "—" : `${disk.toFixed(0)}%`}
           percent={disk}
+          detail={
+            server.disk_used === undefined || !server.disk_total
+              ? "—"
+              : `${formatTrafficCompact(server.disk_used)} / ${formatTrafficCompact(server.disk_total)}`
+          }
         />
         <div className="premium-probe-resource premium-probe-resource-value">
           <span>负载</span>
