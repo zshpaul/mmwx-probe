@@ -2964,13 +2964,15 @@ function ServerDetailDrawer({
             <strong>{latency === undefined ? "—" : `${latency} ms`}</strong>
           </div>
         </div>
-        <section className="premium-probe-drawer-section premium-probe-drawer-tri">
-          <div className="premium-probe-drawer-section-heading">
-            <h3>三网网络质量</h3>
-            <span>当前延迟与丢包</span>
-          </div>
-          <PremiumTriISPSummary server={server} triISP={triISP} />
-        </section>
+        {triISPRows(triISP, server.ping || []).length > 0 && (
+          <section className="premium-probe-drawer-section premium-probe-drawer-tri">
+            <div className="premium-probe-drawer-section-heading">
+              <h3>三网网络质量</h3>
+              <span>当前延迟与丢包</span>
+            </div>
+            <PremiumTriISPSummary server={server} triISP={triISP} />
+          </section>
+        )}
         {server.conn_history && (
           <section className="premium-probe-drawer-section premium-probe-drawer-conns">
             <div className="premium-probe-traffic-heading">
