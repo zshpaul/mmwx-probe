@@ -2644,13 +2644,6 @@ function PremiumServerCard({
   const trafficPercent = server.traffic_limit
     ? percentage(trafficUsed, server.traffic_limit)
     : undefined;
-  const latency = averageLatency(server);
-  const losses = (server.ping || [])
-    .map((item) => item.loss_pct)
-    .filter((value) => value >= 0);
-  const loss = losses.length
-    ? losses.reduce((total, value) => total + value, 0) / losses.length
-    : undefined;
   const code = serverRegionKey(server);
   const flag = countryFlag(code) || server.region || "";
   const fullRegionLabel = localizedRegionLabel(server, code);
@@ -2757,14 +2750,6 @@ function PremiumServerCard({
         <div>
           <span>上行</span>
           <strong>{formatBitSpeed(server.upload_speed || 0)}</strong>
-        </div>
-        <div>
-          <span>延迟</span>
-          <strong>{latency === undefined ? "—" : `${latency} ms`}</strong>
-        </div>
-        <div>
-          <span>丢包</span>
-          <strong>{loss === undefined ? "—" : `${loss.toFixed(2)}%`}</strong>
         </div>
       </div>
 
