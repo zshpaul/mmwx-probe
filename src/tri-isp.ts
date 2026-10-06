@@ -59,8 +59,8 @@ function inferISPKind(value?: string): ISPKind | undefined {
 /**
  * 主控旧版或公开 API 没有下发 tri_isp 时，优先从 ping[].isp 自动识别三网。
  *
- * 只认明确的 ISP 字段，不拿普通 label / key 猜运营商，避免把任意前三个 Ping
- * 目标错误标成电信、联通、移动。只要识别到任意一个运营商，就固定产出三行；
+ * 优先认 ISP 字段；旧数据若 ISP 为空，只在 label 明确包含运营商名称时识别。
+ * 不拿任意前三个 Ping 目标硬凑，避免误标。只要识别到任意一个运营商，就固定产出三行；
  * 缺失的运营商保留空行，由 UI 显示「—」。
  */
 function inferRowsFromSeries<
@@ -68,7 +68,7 @@ function inferRowsFromSeries<
 >(series: S[]): TriISPRow<S>[] {
   const matched = new Map<ISPKind, S>();
   for (const item of series) {
-    const kind = inferISPKind(item.isp);
+    const kind = inferISPKind(item.isp) ?? inferISPKind(item.label);
     if (kind && !matched.has(kind)) matched.set(kind, item);
   }
   if (matched.size === 0) return [];
