@@ -2439,6 +2439,37 @@ function PremiumNetworkView({
   );
 }
 
+function formatUptimeCompact(seconds?: number): string {
+  if (seconds === undefined || seconds < 0) return "—";
+  const totalMinutes = Math.floor(seconds / 60);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return \`${days}天 ${hours}时\`;
+  if (hours > 0) return \`${hours}时 ${minutes}分\`;
+  return \`${Math.max(0, minutes)}分\`;
+}
+
+function renewalSummary(server: ProbeServer): string {
+  if (server.renewal_cycle === "permanent") return "永久";
+  if (!server.expires_at) return "—";
+  const end = new Date(\`${server.expires_at}T23:59:59\`).getTime();
+  const days = Math.ceil((end - Date.now()) / 86400000);
+  if (days < 0) return \`已过期 ${Math.abs(days)} 天\`;
+  if (days === 0) return "今天到期";
+  if (days <= 30) return \`${days} 天后\`;
+  return server.expires_at;
+}
+
+function renewalPrice(server: ProbeServer): string {
+  if (server.renewal_cycle === "permanent") return "一次性";
+  if (server.renewal_price_cny !== undefined)
+    return \`¥${server.renewal_price_cny.toFixed(2)}\`;
+  if (server.renewal_price !== undefined)
+    return \`${server.renewal_price.toFixed(2)} ${server.renewal_currency || ""}\`.trim();
+  return "—";
+}
+
 function PremiumServerCard({
   server,
   index,
@@ -2454,8 +2485,11 @@ function PremiumServerCard({
   const disk = resourcePercentage(server.disk_used, server.disk_total);
   const trafficUsed = billableTraffic(server) ?? server.traffic_used_up ?? 0;
   const trafficValue = server.traffic_limit
-    ? `${formatTrafficCompact(trafficUsed)} / ${formatTrafficCompact(server.traffic_limit)}`
+    ? \`${formatTrafficCompact(trafficUsed)} / ${formatTrafficCompact(server.traffic_limit)}\`
     : formatTrafficCompact(trafficUsed);
+  const trafficPercent = server.traffic_limit
+    ? percentage(trafficUsed, server.traffic_limit)
+    : undefined;
   const latency = averageLatency(server);
   const losses = (server.ping || [])
     .map((item) => item.loss_pct)
@@ -2465,31 +2499,25 @@ function PremiumServerCard({
     : undefined;
   const code = serverRegionKey(server);
   const flag = countryFlag(code) || server.region || "";
+  const fullRegionLabel = localizedRegionLabel(server, code);
+  const regionLabel = flag
+    ? fullRegionLabel.replace(flag, "").trim()
+    : fullRegionLabel;
   const health = serverHealth(server);
-  const dailyTraffic = dailyTrafficRows(
-    server,
-    hasTrafficPeriod(server) ? "period" : "recent7",
-  );
-  const maxDailyTraffic = Math.max(
-    1,
-    ...dailyTraffic.map((day) => day.total || day.uplink + day.downlink),
-  );
-  const latencyBuckets = aggregatePingBuckets(server.ping || []);
-  const latencySamples = latencyBuckets
-    .map((bucket, bucketIndex): TrendSample | undefined => {
-      if (bucket.ms === undefined) return undefined;
-      const minutesAgo = (latencyBuckets.length - 1 - bucketIndex) * 5;
-      return {
-        label: minutesAgo === 0 ? "当前时间桶" : `${minutesAgo} 分钟前`,
-        value: bucket.ms,
-        formatted: `${bucket.ms.toFixed(0)} ms`,
-      };
-    })
-    .filter((sample): sample is TrendSample => sample !== undefined);
+  const load = server.loadavg?.trim().split(/\s+/)[0] || "—";
+  const expiry = renewalSummary(server);
+  const isDue =
+    server.renewal_cycle !== "permanent" &&
+    !!server.expires_at &&
+    new Date(\`${server.expires_at}T23:59:59\`).getTime() - Date.now() <=
+      30 * 86400000;
 
   return (
     <article
-      className="premium-probe-server-card"
+      className={cn(
+        "premium-probe-server-card",
+        !server.online && "is-offline",
+      )}
       role="button"
       tabIndex={0}
       onClick={onOpen}
@@ -2498,82 +2526,120 @@ function PremiumServerCard({
       }}
     >
       <header>
-        <h3>
-          <Twemoji>
-            {displayServerName(server.name, `#${index + 1}`, flag)}
-          </Twemoji>
-        </h3>
-        {showHealthScore && (
-          <span
-            className="premium-probe-health-score"
-            data-tone={health.tone}
-            title={health.issues.join("、") || "运行状态正常"}
-          >
-            {health.score} · {health.label}
+        <div className="premium-probe-card-identity">
+          <h3>
+            <Twemoji>
+              {displayServerName(server.name, \`#${index + 1}\`, flag)}
+            </Twemoji>
+          </h3>
+          <div className="premium-probe-card-meta">
+            <Twemoji>{regionLabel || "未知地区"}</Twemoji>
+            {server.provider_name && <span>{server.provider_name}</span>}
+          </div>
+        </div>
+        <div className="premium-probe-card-badges">
+          {showHealthScore && server.online && (
+            <span
+              className="premium-probe-health-score"
+              data-tone={health.tone}
+              title={health.issues.join("、") || "运行状态正常"}
+            >
+              {health.score} · {health.label}
+            </span>
+          )}
+          <span className="premium-probe-server-status">
+            <i
+              className={cn(
+                "premium-probe-live-dot",
+                !server.online && "is-offline",
+              )}
+            />
+            {server.online ? "在线" : "离线"}
+            <ChevronRight />
           </span>
-        )}
-        <span className="premium-probe-server-status">
-          <i
-            className={cn(
-              "premium-probe-live-dot",
-              !server.online && "is-offline",
-            )}
-          />
-          {server.online ? "在线" : "离线"}
-          <ChevronRight />
-        </span>
+        </div>
       </header>
+
       <div className="premium-probe-resource-grid">
         <MetricBar
           label="CPU"
           value={
-            server.cpu_pct === undefined ? "—" : `${server.cpu_pct.toFixed(0)}%`
+            server.cpu_pct === undefined ? "—" : \`${server.cpu_pct.toFixed(0)}%\`
           }
           percent={server.cpu_pct}
         />
         <MetricBar
           label="内存"
-          value={mem === undefined ? "—" : `${mem.toFixed(0)}%`}
+          value={mem === undefined ? "—" : \`${mem.toFixed(0)}%\`}
           percent={mem}
         />
         <MetricBar
           label="硬盘"
-          value={disk === undefined ? "—" : `${disk.toFixed(0)}%`}
+          value={disk === undefined ? "—" : \`${disk.toFixed(0)}%\`}
           percent={disk}
         />
+        <div className="premium-probe-resource premium-probe-resource-value">
+          <span>负载</span>
+          <strong>{load}</strong>
+          <small>1 min</small>
+        </div>
       </div>
-      <div className="premium-probe-server-footer">
-        <div className="premium-probe-card-traffic">
+
+      <div className="premium-probe-card-network">
+        <div>
+          <span>下行</span>
+          <strong>{formatBitSpeed(server.download_speed || 0)}</strong>
+        </div>
+        <div>
+          <span>上行</span>
+          <strong>{formatBitSpeed(server.upload_speed || 0)}</strong>
+        </div>
+        <div>
+          <span>延迟</span>
+          <strong>{latency === undefined ? "—" : \`${latency} ms\`}</strong>
+        </div>
+        <div>
+          <span>丢包</span>
+          <strong>{loss === undefined ? "—" : \`${loss.toFixed(2)}%\`}</strong>
+        </div>
+      </div>
+
+      <div className="premium-probe-card-traffic-summary">
+        <div>
           <span>{trafficUsageLabel(server)}</span>
           <strong>{trafficValue}</strong>
-          <i aria-label="原始上下行每日流量柱状图">
-            {dailyTraffic.map((day) => {
-              const total = day.total || day.uplink + day.downlink;
-              return (
-                <b
-                  key={day.date}
-                  title={`${day.date} · ${formatTrafficCompact(total)}`}
-                  style={{
-                    height: `${Math.max(8, (total / maxDailyTraffic) * 100)}%`,
-                  }}
-                />
-              );
-            })}
-          </i>
-          <small
-            title={`计费规则：${trafficRuleLabel(server)}；柱状图为原始上下行，不应用计费方向或对账调整`}
-          >
-            {hasTrafficPeriod(server) ? "周期" : "近 7 日"}原始趋势 ·{" "}
-            {trafficRuleLabel(server)}
-          </small>
         </div>
-        <div className="premium-probe-card-latency">
-          <span>当前延迟</span>
-          <strong>{latency === undefined ? "—" : `${latency} ms`}</strong>
-          <InteractiveTrend samples={latencySamples} compact showArea={false} />
-          <small>
-            {loss === undefined ? "暂无丢包数据" : `丢包 ${loss.toFixed(2)}%`}
-          </small>
+        {trafficPercent !== undefined && (
+          <i aria-label={\`流量额度已使用 ${trafficPercent.toFixed(0)}%\`}>
+            <b style={{ width: \`${trafficPercent}%\` }} />
+          </i>
+        )}
+        <small>
+          {trafficPercent === undefined
+            ? trafficRuleLabel(server)
+            : \`额度已使用 ${trafficPercent.toFixed(0)}% · ${trafficRuleLabel(server)}\`}
+        </small>
+      </div>
+
+      <div className="premium-probe-card-lifecycle">
+        <div>
+          <span>运行</span>
+          <strong>{formatUptimeCompact(server.uptime)}</strong>
+        </div>
+        <div>
+          <span>到期</span>
+          <strong data-tone={isDue ? "warning" : undefined}>{expiry}</strong>
+        </div>
+        <div>
+          <span>续费</span>
+          <strong>{renewalPrice(server)}</strong>
+        </div>
+        <div title={CONN_COUNT_HINT}>
+          <span>连接</span>
+          <strong>
+            TCP {connCount(server.tcp_connections)} · UDP{" "}
+            {connCount(server.udp_connections)}
+          </strong>
         </div>
       </div>
     </article>
@@ -3021,6 +3087,9 @@ export function PremiumProbePage({
 
   const online = servers.filter((server) => server.online).length;
   const offline = servers.length - online;
+  const attention = servers.filter(
+    (server) => server.online && serverHealth(server).score < 75,
+  ).length;
   const showGlobe = data?.show_globe === true && regions.length > 0;
   const showDailyTrend = data?.show_daily_trend !== false;
   const showTrafficHotspots = data?.show_traffic_hotspots !== false;
@@ -3118,7 +3187,7 @@ export function PremiumProbePage({
               className={view === "card" ? "is-active" : undefined}
               onClick={() => changeView("card")}
             >
-              <Globe2 /> 地图视图
+              <Server /> 总览
             </button>
             <button
               type="button"
@@ -3157,69 +3226,75 @@ export function PremiumProbePage({
           <>
             <section
               key="card"
-              className={cn(
-                "premium-probe-hero",
-                !showGlobe && "without-globe",
-                overviewModuleCount === 2 && "is-compact-overview",
-              )}
+              className="premium-probe-hero premium-probe-hero-overview"
             >
               <article className="premium-probe-panel premium-probe-overview">
-                <h2>
-                  <Server /> 全球节点概览
-                </h2>
-                <div className="premium-probe-kpis">
-                  {[
-                    {
-                      key: "all" as const,
-                      value: servers.length,
-                      label: "台服务器",
-                      icon: Server,
-                    },
-                    {
-                      key: "online" as const,
-                      value: online,
-                      label: "在线",
-                      icon: CheckCircle2,
-                    },
-                    {
-                      key: "offline" as const,
-                      value: offline,
-                      label: "离线",
-                      icon: XCircle,
-                    },
-                  ].map((item) => (
-                    <button
-                      type="button"
-                      key={item.key}
-                      onClick={() => selectStatus(item.key)}
-                    >
-                      <strong>{item.value}</strong>
+                <div className="premium-probe-overview-heading">
+                  <div>
+                    <span>Infrastructure overview</span>
+                    <h2>
+                      <Server /> 服务器总览
+                    </h2>
+                  </div>
+                  <small>先看整体健康，再定位单机详情</small>
+                </div>
+
+                <div className="premium-probe-kpis premium-probe-kpis-expanded">
+                  <button type="button" onClick={() => selectStatus("all")}>
+                    <strong>{servers.length}</strong>
+                    <span>
+                      <Server /> 服务器
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => selectStatus("online")}>
+                    <strong>{online}</strong>
+                    <span>
+                      <CheckCircle2 /> 在线
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => selectStatus("offline")}>
+                    <strong>{offline}</strong>
+                    <span>
+                      <XCircle /> 离线
+                    </span>
+                  </button>
+                  {data?.show_health_score === true && (
+                    <div className="premium-probe-kpi-static is-attention">
+                      <strong>{attention}</strong>
                       <span>
-                        <item.icon /> {item.label}
+                        <ShieldCheck /> 需关注
                       </span>
-                    </button>
-                  ))}
+                    </div>
+                  )}
+                  <div className="premium-probe-kpi-static is-speed">
+                    <strong>{formatBitSpeed(totalDownload)}</strong>
+                    <span>总下行</span>
+                  </div>
+                  <div className="premium-probe-kpi-static is-speed">
+                    <strong>{formatBitSpeed(totalUpload)}</strong>
+                    <span>总上行</span>
+                  </div>
                   <button type="button" onClick={clearFilters}>
                     <strong>{regions.length}</strong>
                     <span>
-                      <Globe2 /> 个地区
+                      <Globe2 /> 地区
                     </span>
                   </button>
                 </div>
 
                 <div
                   className={cn(
-                    "premium-probe-network-grid",
-                    `has-${overviewModuleCount}-modules`,
+                    "premium-probe-network-grid premium-probe-overview-trends",
+                    \`has-${overviewModuleCount}-modules\`,
                   )}
                 >
                   <SpeedSnapshot
-                    label="总下行网速"
+                    label="总下行实时趋势"
                     value={formatBitSpeed(totalDownload)}
                     samples={liveSpeedHistory.download}
                   />
                   <SpeedSnapshot
-                    label="总上行网速"
+                    label="总上行实时趋势"
                     value={formatBitSpeed(totalUpload)}
                     samples={liveSpeedHistory.upload}
                   />
@@ -3227,36 +3302,6 @@ export function PremiumProbePage({
                   {showTrafficHotspots && <TrafficHotspots servers={servers} />}
                 </div>
               </article>
-
-              {showGlobe && (
-                <article className="premium-probe-panel premium-probe-map">
-                  <div className="premium-probe-panel-heading">
-                    <h2>
-                      <Globe2 /> 地区分布
-                    </h2>
-                    <span>{regions.length} 个地区</span>
-                  </div>
-                  <div className="premium-probe-map-content">
-                    <BlackGoldGlobe regions={regions} />
-                    <aside>
-                      <h3>地区状态</h3>
-                      {regions.map((item) => (
-                        <button
-                          type="button"
-                          key={item.code}
-                          onClick={() => selectRegion(item.code)}
-                        >
-                          <Twemoji>{item.label}</Twemoji>
-                          <i
-                            className={item.online === 0 ? "is-offline" : ""}
-                          />
-                          <strong>{item.total}</strong>
-                        </button>
-                      ))}
-                    </aside>
-                  </div>
-                </article>
-              )}
             </section>
 
             <section className="premium-probe-servers">
@@ -3318,6 +3363,38 @@ export function PremiumProbePage({
                 </div>
               )}
             </section>
+
+            {showGlobe && (
+              <section className="premium-probe-map-section">
+                <article className="premium-probe-panel premium-probe-map">
+                  <div className="premium-probe-panel-heading">
+                    <h2>
+                      <Globe2 /> 地区分布
+                    </h2>
+                    <span>{regions.length} 个地区 · 点击地区可筛选服务器</span>
+                  </div>
+                  <div className="premium-probe-map-content">
+                    <BlackGoldGlobe regions={regions} />
+                    <aside>
+                      <h3>地区状态</h3>
+                      {regions.map((item) => (
+                        <button
+                          type="button"
+                          key={item.code}
+                          onClick={() => selectRegion(item.code)}
+                        >
+                          <Twemoji>{item.label}</Twemoji>
+                          <i
+                            className={item.online === 0 ? "is-offline" : ""}
+                          />
+                          <strong>{item.total}</strong>
+                        </button>
+                      ))}
+                    </aside>
+                  </div>
+                </article>
+              </section>
+            )}
           </>
         )}
       </main>
