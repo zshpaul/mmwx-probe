@@ -4842,7 +4842,7 @@
 
 .premium-probe-card-network {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   overflow: hidden;
   margin: 0.1rem 0 0.8rem;
   border: 1px solid rgba(216, 180, 106, 0.13);
@@ -5032,15 +5032,6 @@
   .premium-probe-card-network,
   .premium-probe-card-lifecycle {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .premium-probe-card-network > div:nth-child(3) {
-    border-left: 0;
-    border-top: 1px solid rgba(216, 180, 106, 0.12);
-  }
-
-  .premium-probe-card-network > div:nth-child(4) {
-    border-top: 1px solid rgba(216, 180, 106, 0.12);
   }
 }
 
