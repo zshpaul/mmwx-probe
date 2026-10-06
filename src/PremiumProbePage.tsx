@@ -984,6 +984,17 @@ function PremiumResourceOverview({
   };
 }) {
   const enabledCount = Object.values(visibility).filter(Boolean).length;
+  const online = servers.filter((server) => server.online).length;
+  const attention = servers.filter(
+    (server) => server.online && serverHealth(server).score < 75,
+  ).length;
+  const pressureRows = resourcePressureRows(servers);
+  const peakPressure = pressureRows[0]?.pressure;
+  const quotaRows = trafficQuotaRows(servers);
+  const highestQuota = quotaRows[0]?.percent;
+  const dueCount = renewalTimelineRows(servers).filter(
+    (item) => item.days >= 0 && item.days <= 30,
+  ).length;
 
   return (
     <section className="premium-probe-resource-view">
@@ -1002,6 +1013,35 @@ function PremiumResourceOverview({
           {servers.length} 台服务器 · {enabledCount} 个模块
         </strong>
       </header>
+
+      <div className="premium-probe-resource-kpis">
+        <article>
+          <span>在线节点</span>
+          <strong>{online}/{servers.length}</strong>
+          <small>{attention > 0 ? `${attention} 台需要关注` : "运行状态平稳"}</small>
+        </article>
+        <article>
+          <span>最高资源压力</span>
+          <strong>
+            {peakPressure === undefined || peakPressure < 0
+              ? "—"
+              : `${peakPressure.toFixed(0)}%`}
+          </strong>
+          <small>{pressureRows[0]?.name || "暂无资源数据"}</small>
+        </article>
+        <article>
+          <span>最高流量额度</span>
+          <strong>
+            {highestQuota === undefined ? "—" : `${highestQuota.toFixed(0)}%`}
+          </strong>
+          <small>{quotaRows[0]?.name || "暂无额度配置"}</small>
+        </article>
+        <article>
+          <span>30 天内到期</span>
+          <strong>{dueCount}</strong>
+          <small>{dueCount > 0 ? "建议提前检查续费" : "暂无临近到期"}</small>
+        </article>
+      </div>
 
       {enabledCount > 0 ? (
         <DataInsightPanels
@@ -2113,6 +2153,9 @@ function PremiumNetworkView({
     ? reachableRows.reduce((total, row) => total + (row.loss || 0), 0) /
       reachableRows.length
     : undefined;
+  const selectedTriRows = selectedServer
+    ? triISPRows(triISP, selectedServer.ping || [])
+    : [];
   const detailBuckets = detail?.success
     ? detail.series.buckets.map((bucket, index, buckets) => {
         const end =
@@ -2195,6 +2238,56 @@ function PremiumNetworkView({
           </label>
         </div>
       </div>
+
+      {selectedServer && (
+        <article className="premium-probe-network-focus">
+          <div className="premium-probe-network-focus-identity">
+            <span>当前服务器</span>
+            <strong>
+              <Twemoji>
+                {displayServerName(
+                  selectedServer.name,
+                  `#${selectedServerIndex + 1}`,
+                  countryFlag(serverRegionKey(selectedServer)) ||
+                    selectedServer.region ||
+                    "",
+                )}
+              </Twemoji>
+            </strong>
+            <small>
+              <Twemoji>{localizedRegionLabel(selectedServer)}</Twemoji>
+              {selectedServer.provider_name
+                ? ` · ${selectedServer.provider_name}`
+                : ""}
+            </small>
+          </div>
+          <div className="premium-probe-network-focus-tri">
+            {selectedTriRows.length > 0 ? (
+              selectedTriRows.map((row) => (
+                <div key={row.isp} data-tone={triISPTone(row.series)}>
+                  <span>{row.label}</span>
+                  <strong>
+                    {!row.series
+                      ? "—"
+                      : row.series.current_ms < 0
+                        ? "不可达"
+                        : `${row.series.current_ms} ms`}
+                  </strong>
+                  <small>
+                    {!row.series || row.series.loss_pct < 0
+                      ? "丢包 —"
+                      : `${row.series.loss_pct.toFixed(1)}%`}
+                  </small>
+                </div>
+              ))
+            ) : (
+              <span className="premium-probe-network-focus-empty">
+                当前未配置三网代表探测点
+              </span>
+            )}
+          </div>
+        </article>
+      )}
 
       <div className="premium-probe-network-kpis">
         {[
@@ -2478,16 +2571,69 @@ function renewalPrice(server: ProbeServer): string {
   return "—";
 }
 
+
+function triISPTone(series?: ProbePingSeries): "good" | "medium" | "poor" | "missing" {
+  if (!series || series.current_ms < 0 || series.loss_pct < 0) return "missing";
+  if (series.loss_pct >= 10 || series.current_ms >= 250) return "poor";
+  if (series.loss_pct >= 3 || series.current_ms >= 120) return "medium";
+  return "good";
+}
+
+function PremiumTriISPSummary({
+  server,
+  triISP,
+  compact = false,
+}: {
+  server: ProbeServer;
+  triISP?: TriISPPublic;
+  compact?: boolean;
+}) {
+  const rows = triISPRows(triISP, server.ping || []);
+  if (rows.length === 0) return null;
+  return (
+    <div
+      className={cn(
+        "premium-probe-tri-summary",
+        compact && "is-compact",
+      )}
+      aria-label="三网延迟与丢包"
+    >
+      {rows.map((row) => {
+        const tone = triISPTone(row.series);
+        return (
+          <div key={row.isp} data-tone={tone}>
+            <span>{row.label}</span>
+            <strong>
+              {!row.series
+                ? "—"
+                : row.series.current_ms < 0
+                  ? "不可达"
+                  : `${row.series.current_ms} ms`}
+            </strong>
+            <small>
+              {!row.series || row.series.loss_pct < 0
+                ? "丢包 —"
+                : `丢包 ${row.series.loss_pct.toFixed(1)}%`}
+            </small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PremiumServerCard({
   server,
   index,
   onOpen,
   showHealthScore,
+  triISP,
 }: {
   server: ProbeServer;
   index: number;
   onOpen: () => void;
   showHealthScore: boolean;
+  triISP?: TriISPPublic;
 }) {
   const mem = resourcePercentage(server.mem_used, server.mem_total);
   const disk = resourcePercentage(server.disk_used, server.disk_total);
@@ -2622,6 +2768,8 @@ function PremiumServerCard({
         </div>
       </div>
 
+      <PremiumTriISPSummary server={server} triISP={triISP} compact />
+
       <div className="premium-probe-card-traffic-summary">
         <div>
           <span>{trafficUsageLabel(server)}</span>
@@ -2669,11 +2817,13 @@ function ServerDetailDrawer({
   index,
   onClose,
   historyDays,
+  triISP,
 }: {
   server: ProbeServer;
   index: number;
   onClose: () => void;
   historyDays?: number;
+  triISP?: TriISPPublic;
 }) {
   const health = serverHealth(server);
   const mem = resourcePercentage(server.mem_used, server.mem_total);
@@ -2780,15 +2930,33 @@ function ServerDetailDrawer({
         </section>
         <div className="premium-probe-drawer-metrics">
           {[
-            ["CPU", server.cpu_pct],
-            ["内存", mem],
-            ["硬盘", disk],
-          ].map(([label, value]) => (
-            <div key={String(label)}>
-              <span>{label}</span>
-              <strong>
-                {typeof value === "number" ? `${value.toFixed(0)}%` : "—"}
-              </strong>
+            {
+              label: "CPU",
+              value:
+                server.cpu_pct === undefined ? "—" : `${server.cpu_pct.toFixed(0)}%`,
+              detail: server.loadavg ? `Load ${server.loadavg}` : "Load —",
+            },
+            {
+              label: "内存",
+              value: mem === undefined ? "—" : `${mem.toFixed(0)}%`,
+              detail:
+                server.mem_used === undefined || !server.mem_total
+                  ? "—"
+                  : `${formatTrafficCompact(server.mem_used)} / ${formatTrafficCompact(server.mem_total)}`,
+            },
+            {
+              label: "硬盘",
+              value: disk === undefined ? "—" : `${disk.toFixed(0)}%`,
+              detail:
+                server.disk_used === undefined || !server.disk_total
+                  ? "—"
+                  : `${formatTrafficCompact(server.disk_used)} / ${formatTrafficCompact(server.disk_total)}`,
+            },
+          ].map((item) => (
+            <div key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <small>{item.detail}</small>
             </div>
           ))}
           <div>
@@ -2796,6 +2964,13 @@ function ServerDetailDrawer({
             <strong>{latency === undefined ? "—" : `${latency} ms`}</strong>
           </div>
         </div>
+        <section className="premium-probe-drawer-section premium-probe-drawer-tri">
+          <div className="premium-probe-drawer-section-heading">
+            <h3>三网网络质量</h3>
+            <span>当前延迟与丢包</span>
+          </div>
+          <PremiumTriISPSummary server={server} triISP={triISP} />
+        </section>
         {server.conn_history && (
           <section className="premium-probe-drawer-section premium-probe-drawer-conns">
             <div className="premium-probe-traffic-heading">
@@ -3376,6 +3551,7 @@ export function PremiumProbePage({
                       key={`${server.name || "server"}-${index}`}
                       onOpen={() => showServerDetail(index)}
                       showHealthScore={data?.show_health_score === true}
+                      triISP={data?.tri_isp}
                     />
                   ))}
                 </div>
@@ -3424,6 +3600,7 @@ export function PremiumProbePage({
           index={selectedServerIndex}
           onClose={closeServerDetail}
           historyDays={data?.history_days}
+          triISP={data?.tri_isp}
         />
       )}
 
