@@ -28,6 +28,7 @@ function inferISPKind(value?: string): ISPKind | undefined {
 
   if (
     normalized === "ct" ||
+    normalized === "ctcc" ||
     normalized.includes("电信") ||
     normalized.includes("telecom") ||
     normalized.includes("chinatelecom")
@@ -36,6 +37,7 @@ function inferISPKind(value?: string): ISPKind | undefined {
 
   if (
     normalized === "cu" ||
+    normalized === "cucc" ||
     normalized.includes("联通") ||
     normalized.includes("unicom") ||
     normalized.includes("chinaunicom")
@@ -44,6 +46,7 @@ function inferISPKind(value?: string): ISPKind | undefined {
 
   if (
     normalized === "cm" ||
+    normalized === "cmcc" ||
     normalized.includes("移动") ||
     normalized.includes("mobile") ||
     normalized.includes("chinamobile")
