@@ -2445,28 +2445,28 @@ function formatUptimeCompact(seconds?: number): string {
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
-  if (days > 0) return \`${days}天 ${hours}时\`;
-  if (hours > 0) return \`${hours}时 ${minutes}分\`;
-  return \`${Math.max(0, minutes)}分\`;
+  if (days > 0) return `${days}天 ${hours}时`;
+  if (hours > 0) return `${hours}时 ${minutes}分`;
+  return `${Math.max(0, minutes)}分`;
 }
 
 function renewalSummary(server: ProbeServer): string {
   if (server.renewal_cycle === "permanent") return "永久";
   if (!server.expires_at) return "—";
-  const end = new Date(\`${server.expires_at}T23:59:59\`).getTime();
+  const end = new Date(`${server.expires_at}T23:59:59`).getTime();
   const days = Math.ceil((end - Date.now()) / 86400000);
-  if (days < 0) return \`已过期 ${Math.abs(days)} 天\`;
+  if (days < 0) return `已过期 ${Math.abs(days)} 天`;
   if (days === 0) return "今天到期";
-  if (days <= 30) return \`${days} 天后\`;
+  if (days <= 30) return `${days} 天后`;
   return server.expires_at;
 }
 
 function renewalPrice(server: ProbeServer): string {
   if (server.renewal_cycle === "permanent") return "一次性";
   if (server.renewal_price_cny !== undefined)
-    return \`¥${server.renewal_price_cny.toFixed(2)}\`;
+    return `¥${server.renewal_price_cny.toFixed(2)}`;
   if (server.renewal_price !== undefined)
-    return \`${server.renewal_price.toFixed(2)} ${server.renewal_currency || ""}\`.trim();
+    return `${server.renewal_price.toFixed(2)} ${server.renewal_currency || ""}`.trim();
   return "—";
 }
 
@@ -2485,7 +2485,7 @@ function PremiumServerCard({
   const disk = resourcePercentage(server.disk_used, server.disk_total);
   const trafficUsed = billableTraffic(server) ?? server.traffic_used_up ?? 0;
   const trafficValue = server.traffic_limit
-    ? \`${formatTrafficCompact(trafficUsed)} / ${formatTrafficCompact(server.traffic_limit)}\`
+    ? `${formatTrafficCompact(trafficUsed)} / ${formatTrafficCompact(server.traffic_limit)}`
     : formatTrafficCompact(trafficUsed);
   const trafficPercent = server.traffic_limit
     ? percentage(trafficUsed, server.traffic_limit)
@@ -2509,7 +2509,7 @@ function PremiumServerCard({
   const isDue =
     server.renewal_cycle !== "permanent" &&
     !!server.expires_at &&
-    new Date(\`${server.expires_at}T23:59:59\`).getTime() - Date.now() <=
+    new Date(`${server.expires_at}T23:59:59`).getTime() - Date.now() <=
       30 * 86400000;
 
   return (
@@ -2529,7 +2529,7 @@ function PremiumServerCard({
         <div className="premium-probe-card-identity">
           <h3>
             <Twemoji>
-              {displayServerName(server.name, \`#${index + 1}\`, flag)}
+              {displayServerName(server.name, `#${index + 1}`, flag)}
             </Twemoji>
           </h3>
           <div className="premium-probe-card-meta">
@@ -2564,18 +2564,18 @@ function PremiumServerCard({
         <MetricBar
           label="CPU"
           value={
-            server.cpu_pct === undefined ? "—" : \`${server.cpu_pct.toFixed(0)}%\`
+            server.cpu_pct === undefined ? "—" : `${server.cpu_pct.toFixed(0)}%`
           }
           percent={server.cpu_pct}
         />
         <MetricBar
           label="内存"
-          value={mem === undefined ? "—" : \`${mem.toFixed(0)}%\`}
+          value={mem === undefined ? "—" : `${mem.toFixed(0)}%`}
           percent={mem}
         />
         <MetricBar
           label="硬盘"
-          value={disk === undefined ? "—" : \`${disk.toFixed(0)}%\`}
+          value={disk === undefined ? "—" : `${disk.toFixed(0)}%`}
           percent={disk}
         />
         <div className="premium-probe-resource premium-probe-resource-value">
@@ -2596,11 +2596,11 @@ function PremiumServerCard({
         </div>
         <div>
           <span>延迟</span>
-          <strong>{latency === undefined ? "—" : \`${latency} ms\`}</strong>
+          <strong>{latency === undefined ? "—" : `${latency} ms`}</strong>
         </div>
         <div>
           <span>丢包</span>
-          <strong>{loss === undefined ? "—" : \`${loss.toFixed(2)}%\`}</strong>
+          <strong>{loss === undefined ? "—" : `${loss.toFixed(2)}%`}</strong>
         </div>
       </div>
 
@@ -2610,14 +2610,14 @@ function PremiumServerCard({
           <strong>{trafficValue}</strong>
         </div>
         {trafficPercent !== undefined && (
-          <i aria-label={\`流量额度已使用 ${trafficPercent.toFixed(0)}%\`}>
-            <b style={{ width: \`${trafficPercent}%\` }} />
+          <i aria-label={`流量额度已使用 ${trafficPercent.toFixed(0)}%`}>
+            <b style={{ width: `${trafficPercent}%` }} />
           </i>
         )}
         <small>
           {trafficPercent === undefined
             ? trafficRuleLabel(server)
-            : \`额度已使用 ${trafficPercent.toFixed(0)}% · ${trafficRuleLabel(server)}\`}
+            : `额度已使用 ${trafficPercent.toFixed(0)}% · ${trafficRuleLabel(server)}`}
         </small>
       </div>
 
@@ -3285,7 +3285,7 @@ export function PremiumProbePage({
                 <div
                   className={cn(
                     "premium-probe-network-grid premium-probe-overview-trends",
-                    \`has-${overviewModuleCount}-modules\`,
+                    `has-${overviewModuleCount}-modules`,
                   )}
                 >
                   <SpeedSnapshot
