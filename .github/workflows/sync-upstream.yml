@@ -28,6 +28,7 @@ jobs:
           UPSTREAM_REPOSITORY: mmwx-group/mmwx-probe
           UPSTREAM_BRANCH: main
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
@@ -38,5 +39,54 @@ jobs:
             exit 0
           fi
 
-          git merge --no-edit "upstream/${UPSTREAM_BRANCH}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          BASE="$(git merge-base HEAD "upstream/${UPSTREAM_BRANCH}")"
+
+          if git merge --no-edit "upstream/${UPSTREAM_BRANCH}"; then
+            :
+          else
+            mapfile -t CONFLICTS < <(git diff --name-only --diff-filter=U)
+            printf 'Conflicts: %s\n' "${CONFLICTS[*]:-none}"
+
+            if [ "${#CONFLICTS[@]}" -ne 1 ] || [ "${CONFLICTS[0]}" != "src/premium-probe.css" ]; then
+              echo "Unsafe conflict set; manual resolution required."
+              exit 1
+            fi
+
+            python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          path = "src/premium-probe.css"
+          base = subprocess.check_output(["git", "show", f"{subprocess.check_output(['git','merge-base','HEAD','upstream/main'], text=True).strip()}:{path}"])
+          ours = subprocess.check_output(["git", "show", f"HEAD:{path}"])
+          theirs = subprocess.check_output(["git", "show", f"upstream/main:{path}"])
+
+          if not ours.startswith(base) or not theirs.startswith(base):
+              print("premium-probe.css conflict is not a pure EOF append on both sides; refusing automatic resolution.", file=sys.stderr)
+              sys.exit(1)
+
+          upstream_tail = theirs[len(base):].lstrip(b"\r\n")
+          local_tail = ours[len(base):].lstrip(b"\r\n")
+
+          merged = base.rstrip(b"\r\n") + b"\n"
+          if upstream_tail:
+              merged += b"\n" + upstream_tail.rstrip(b"\r\n") + b"\n"
+          if local_tail:
+              merged += b"\n" + local_tail.rstrip(b"\r\n") + b"\n"
+
+          Path(path).write_bytes(merged)
+          PY
+
+            git add src/premium-probe.css
+            git commit --no-edit
+          fi
+
+      - name: Validate merged frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Push merged upstream
+        run: git push origin "HEAD:${GITHUB_REF_NAME}"
