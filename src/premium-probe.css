@@ -5612,3 +5612,311 @@
   color: var(--pp-gold-bright);
   background: rgba(216, 180, 106, 0.12);
 }
+
+
+/* ==== Dashboard polish (Komari / Nezha style status cues) ==== */
+.premium-probe-page {
+  --pp-ok: #5fd38a;
+  --pp-warn: #f0b44c;
+  --pp-bad: #f06a72;
+  --pp-down: #5cc6ee;
+  --pp-up: #7fdc9b;
+  --pp-card-radius: 0.95rem;
+}
+
+:root.theme-premium.light .premium-probe-page {
+  --pp-ok: #1f9d55;
+  --pp-warn: #c47f0f;
+  --pp-bad: #d33e48;
+  --pp-down: #0f84b8;
+  --pp-up: #1f9a4c;
+}
+
+/* Watermarks sit above content; keep them as texture, not noise. */
+:root.theme-premium .premium-probe-watermarks {
+  opacity: 0.16;
+}
+
+:root.theme-premium.light .premium-probe-watermarks {
+  opacity: 0.22;
+}
+
+/* KPI tiles */
+:root.theme-premium .premium-probe-kpis-expanded > button,
+:root.theme-premium .premium-probe-kpis-expanded > .premium-probe-kpi-static {
+  border-radius: 0.8rem;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+:root.theme-premium .premium-probe-kpis-expanded > button:hover {
+  transform: translateY(-2px);
+}
+
+:root.theme-premium .premium-probe-kpis-expanded > button:nth-child(2) strong {
+  color: var(--pp-ok);
+}
+
+:root.theme-premium .premium-probe-kpis-expanded > button:nth-child(3) strong {
+  color: var(--pp-bad);
+}
+
+:root.theme-premium .premium-probe-kpis-expanded > .is-attention strong {
+  color: var(--pp-warn);
+}
+
+/* Server cards: single clean frame + status accent stripe */
+:root.theme-premium .premium-probe-server-card {
+  --card-accent: var(--pp-ok);
+  overflow: hidden;
+  border-radius: var(--pp-card-radius);
+  padding: 1rem 1.05rem 1.05rem;
+}
+
+:root.theme-premium .premium-probe-server-card.is-offline {
+  --card-accent: var(--pp-bad);
+}
+
+:root.theme-premium .premium-probe-server-card::before {
+  inset: 0 0 auto;
+  height: 3px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(
+    90deg,
+    var(--card-accent),
+    color-mix(in srgb, var(--card-accent) 30%, transparent) 55%,
+    transparent
+  );
+  opacity: 0.9;
+}
+
+:root.theme-premium .premium-probe-server-card:hover {
+  transform: translateY(-3px);
+}
+
+:root.theme-premium .premium-probe-server-card.is-offline > :not(header) {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+
+:root.theme-premium .premium-probe-server-card h3 {
+  font-size: 1.12rem;
+  letter-spacing: 0.01em;
+}
+
+:root.theme-premium .premium-probe-card-meta {
+  font-size: 0.7rem;
+}
+
+/* Online / offline pill */
+:root.theme-premium .premium-probe-server-status {
+  padding: 0.2rem 0.5rem 0.2rem 0.45rem;
+  color: var(--pp-ok);
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--pp-ok) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pp-ok) 10%, transparent);
+}
+
+:root.theme-premium .is-offline .premium-probe-server-status {
+  color: var(--pp-bad);
+  border-color: color-mix(in srgb, var(--pp-bad) 35%, transparent);
+  background: color-mix(in srgb, var(--pp-bad) 10%, transparent);
+}
+
+:root.theme-premium .premium-probe-server-status svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-left: -0.15rem;
+}
+
+:root.theme-premium .premium-probe-server-card .premium-probe-live-dot:not(.is-offline) {
+  animation: pp-live-pulse 2.4s ease-out infinite;
+}
+
+@keyframes pp-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pp-ok) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* Resource meters: thicker bars, colour by load */
+:root.theme-premium .premium-probe-resource-grid {
+  gap: 0.75rem;
+}
+
+:root.theme-premium .premium-probe-server-card .premium-probe-resource span {
+  font-size: 0.72rem;
+}
+
+:root.theme-premium .premium-probe-server-card .premium-probe-resource strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+:root.theme-premium .premium-probe-resource.has-detail > small,
+:root.theme-premium .premium-probe-resource-value small {
+  font-size: 0.62rem;
+}
+
+:root.theme-premium .premium-probe-server-card .premium-probe-resource i,
+:root.theme-premium .premium-probe-resource-value::after {
+  height: 6px;
+}
+
+:root.theme-premium .premium-probe-resource i b {
+  transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root.theme-premium .premium-probe-resource i[data-level] b {
+  --bar: var(--pp-ok);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bar) 70%, transparent),
+    var(--bar)
+  );
+  box-shadow: 0 0 8px -2px var(--bar);
+}
+
+:root.theme-premium .premium-probe-resource i[data-level="warning"] b {
+  --bar: var(--pp-warn);
+}
+
+:root.theme-premium .premium-probe-resource i[data-level="critical"] b {
+  --bar: var(--pp-bad);
+}
+
+/* Live speed: colour + arrow per direction */
+:root.theme-premium .premium-probe-card-network {
+  border-radius: 0.65rem;
+}
+
+:root.theme-premium .premium-probe-card-network span {
+  font-size: 0.66rem;
+}
+
+:root.theme-premium .premium-probe-card-network strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+:root.theme-premium .premium-probe-card-network > div:first-child strong {
+  color: var(--pp-down);
+}
+
+:root.theme-premium .premium-probe-card-network > div:nth-child(2) strong {
+  color: var(--pp-up);
+}
+
+:root.theme-premium .premium-probe-card-network > div:first-child span::before {
+  content: "↓ ";
+  color: var(--pp-down);
+  font-weight: 700;
+}
+
+:root.theme-premium .premium-probe-card-network > div:nth-child(2) span::before {
+  content: "↑ ";
+  color: var(--pp-up);
+  font-weight: 700;
+}
+
+/* Tri-ISP tiles tinted by latency quality */
+:root.theme-premium .premium-probe-tri-summary > div {
+  --tone: var(--pp-ok);
+  border-color: color-mix(in srgb, var(--tone) 28%, transparent);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--tone) 6%, transparent);
+}
+
+:root.theme-premium .premium-probe-tri-summary > div[data-tone="medium"] {
+  --tone: var(--pp-warn);
+}
+
+:root.theme-premium .premium-probe-tri-summary > div[data-tone="poor"],
+:root.theme-premium .premium-probe-tri-summary > div[data-tone="missing"] {
+  --tone: var(--pp-bad);
+}
+
+:root.theme-premium .premium-probe-tri-summary span {
+  font-size: 0.64rem;
+}
+
+:root.theme-premium .premium-probe-tri-summary strong {
+  color: var(--tone);
+  font-size: 0.88rem;
+}
+
+:root.theme-premium .premium-probe-tri-summary small {
+  font-size: 0.6rem;
+}
+
+/* Traffic + lifecycle readability */
+:root.theme-premium .premium-probe-card-traffic-summary span,
+:root.theme-premium .premium-probe-card-traffic-summary small,
+:root.theme-premium .premium-probe-card-lifecycle span {
+  font-size: 0.64rem;
+}
+
+:root.theme-premium .premium-probe-card-traffic-summary > div strong {
+  font-size: 0.82rem;
+}
+
+:root.theme-premium .premium-probe-card-traffic-summary > i {
+  height: 6px;
+}
+
+:root.theme-premium .premium-probe-card-lifecycle strong {
+  font-size: 0.7rem;
+}
+
+/* Staggered entrance */
+@media (prefers-reduced-motion: no-preference) {
+  :root.theme-premium .premium-probe-card-grid > .premium-probe-server-card {
+    animation: pp-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  :root.theme-premium .premium-probe-card-grid > :nth-child(2) { animation-delay: 60ms; }
+  :root.theme-premium .premium-probe-card-grid > :nth-child(3) { animation-delay: 120ms; }
+  :root.theme-premium .premium-probe-card-grid > :nth-child(4) { animation-delay: 180ms; }
+  :root.theme-premium .premium-probe-card-grid > :nth-child(5) { animation-delay: 240ms; }
+  :root.theme-premium .premium-probe-card-grid > :nth-child(n + 6) { animation-delay: 300ms; }
+}
+
+@keyframes pp-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (max-width: 420px) {
+  :root.theme-premium .premium-probe-card-network strong {
+    font-size: 0.8rem;
+  }
+
+  /* Keep card tri-ISP tiles side by side instead of three stacked rows. */
+  :root.theme-premium .premium-probe-tri-summary.is-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  :root.theme-premium .premium-probe-tri-summary.is-compact > div {
+    padding: 0.45rem 0.5rem;
+  }
+
+  :root.theme-premium .premium-probe-tri-summary.is-compact strong {
+    font-size: 0.8rem;
+  }
+
+  :root.theme-premium .premium-probe-tri-summary.is-compact small {
+    font-size: 0.56rem;
+  }
+}

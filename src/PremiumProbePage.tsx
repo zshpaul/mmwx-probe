@@ -1348,7 +1348,17 @@ function MetricBar({
       <span>{label}</span>
       <strong>{value}</strong>
       {detail !== undefined && <small>{detail}</small>}
-      <i>
+      <i
+        data-level={
+          percent === undefined
+            ? undefined
+            : percent >= 85
+              ? "critical"
+              : percent >= 60
+                ? "warning"
+                : "normal"
+        }
+      >
         <b style={{ width: `${percent ?? 0}%` }} />
       </i>
     </div>
