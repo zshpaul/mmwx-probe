@@ -64,6 +64,7 @@ import { BlackGoldGlobe, type PremiumProbeRegion } from "./BlackGoldGlobe";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { PasskeyLogin } from "./PasskeyLogin";
 import "./premium-probe.css";
+import "./premium-probe-local.css";
 
 type ProbeData = ProbePayload;
 
