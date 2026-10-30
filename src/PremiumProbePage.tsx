@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
@@ -371,8 +373,9 @@ function resourcePercentage(used?: number, total?: number): number | undefined {
 
 function serverRegionKey(server: ProbeServer): string {
   return (
-    flagToCountryCode(server.region_country) ||
+    // 手动选的国旗优先,自动识别的国家兜底(见 App.tsx probeRegion)
     flagToCountryCode(server.region) ||
+    flagToCountryCode(server.region_country) ||
     "UNKNOWN"
   );
 }
@@ -2886,15 +2889,14 @@ function PremiumServerCard({
           <small>1 min</small>
         </div>
       </div>
-
       <div className="premium-probe-card-network">
         <div>
           <span>下行</span>
-          <strong>{formatBitSpeed(server.download_speed || 0)}</strong>
+          <strong>{server.online ? formatBitSpeed(server.download_speed || 0) : "—"}</strong>
         </div>
         <div>
           <span>上行</span>
-          <strong>{formatBitSpeed(server.upload_speed || 0)}</strong>
+          <strong>{server.online ? formatBitSpeed(server.upload_speed || 0) : "—"}</strong>
         </div>
       </div>
 
