@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "服务器监测",
-  "short_name": "服务器监测",
+  "name": "MMWX Probe",
+  "short_name": "MMWX Probe",
   "description": "妙妙屋 X 服务器监测",
   "lang": "zh-CN",
   "start_url": "/",

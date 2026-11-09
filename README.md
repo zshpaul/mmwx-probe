@@ -10,7 +10,8 @@
 - CPU、内存、硬盘、流量及实时网速
 - 延迟、丢包率及 1h/6h/24h 趋势图
 - WebSocket 实时更新，断线后自动回退到 HTTP 轮询
-- 自动同步主控的 Pixel、Flat、Anime 默认主题
+- 基于 Nezha 默认前端的全新页面，支持浅色/深色及手机/桌面布局
+- 节点搜索、状态/地区筛选、独立详情页与系统资源/网速历史
 - Worker Secret 保护主控探针接口，浏览器无法读取访问密钥
 
 ## 工作方式
@@ -119,6 +120,22 @@ npm run dev
 
 访问 `http://localhost:5173`。Vite 会把 `/api/*` 转发到本地 Worker 的 `8787` 端口。
 
+### 无密钥模拟预览
+
+模拟服务只绑定本机，独立于 Worker，数据通过真实 HTTP/WebSocket 进入页面：
+
+```powershell
+# 终端 1
+node scripts/mock-probe.mjs
+# 终端 2
+$env:VITE_PROBE_MOCK='1'
+npm run dev
+```
+
+模拟模式代理到 `127.0.0.1:8788`，页面明确标记模拟数据。正常开发不设置 `VITE_PROBE_MOCK`；模拟服务及其 `/__qa/*` 测试控制端点不会被打包进 Worker 或静态产物。页面按接口原始下标查询历史，筛选不改变服务器编号；缺失指标显示 `—`，缺失采样保留断点。
+
+WebSocket 收到有效帧时优先使用实时数据；断线后立即回退 HTTP（5 秒一次），以 1–30 秒指数退避重连。15 秒未收到有效帧也会关闭并重连，避免静默连接冻结页面；单次 HTTP 请求 10 秒超时。详情历史每 30 秒刷新，保留天数由主控决定。
+
 ## 常用命令
 
 ```bash
@@ -131,9 +148,7 @@ npm run deploy     # 构建并部署到 Cloudflare Workers
 
 ## 更新与密钥轮换
 
-通过 Cloudflare 按钮创建的 GitHub 仓库内置“Sync upstream”工作流。启用后，它每天北京时间 11:23 检查 `mmwx-group/mmwx-probe` 的 `main` 分支，无冲突时自动合并并推送；Cloudflare Workers Builds 随后会自动重新部署。也可以在仓库的 **Actions → Sync upstream → Run workflow** 中立即检查更新。
-
-GitHub 会默认禁用公共 fork 中的定时工作流。首次部署后，请进入仓库的 **Actions** 页面启用工作流，并在 **Settings → Actions → General → Workflow permissions** 中确认允许 **Read and write permissions**。若用户分支与上游发生合并冲突，或分支保护禁止 GitHub Actions 推送，工作流会停止且不会覆盖用户更改，需要手动解决冲突。
+本 fork 已删除 `.github/workflows/sync-upstream.yml`，停止自动合并上游，以免覆盖重写的前端。上游更新需要人工审查后选择性合并；不要重新启用自动同步工作流。
 
 手动更新仍可执行 `npm ci && npm run deploy`。轮换密钥时，先在主控生成新密钥，立即执行 `npx wrangler secret put PROBE_TOKEN` 并重新部署；在 Worker 更新完成前，探针可能短暂返回 `404`。主控只保存密钥的 SHA-256 哈希，无法找回旧密钥。
 
@@ -161,5 +176,9 @@ git push -u origin main
 提交前确认 `.dev.vars`、`wrangler.local.jsonc`、`node_modules/` 和 `dist/` 未被纳入版本控制。
 
 ## 许可证
+
+页面设计及石色主题适配自 Nezha 默认前端 `nezhahq/user-frontend-backup`（源自 `hamster1963/nezha-dash-v2`），固定提交 `1dd038bea8f6c5143c3e8fb4077fead24994fe4e`，Apache-2.0。署名与改动说明见 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)，完整许可随静态产物一起分发。未使用其商标 logo。
+
+2026-11-09 通过 GitHub API 核验的轻量服务器探针候选（并非全部可观测性产品）：Nezha 10,393 stars（WTFPL，默认前端 Apache-2.0），Komari 6,956（MIT），cppla/ServerStatus 4,683（MIT），zdz/ServerStatus-Rust 2,334（Apache-2.0），hamster1963/nezha-dash 1,692（Apache-2.0），BotoX/ServerStatus 824（WTFPL）。按探针项目主仓库 star 排序选择 Nezha；其前端独立仓库的 star 不等于主项目 star。WTFPL 并不禁止修改和再分发，因此没有跳过第一名。
 
 本项目采用 [Miaomiaowu X Source Available License v1.0](LICENSE)。允许非商业使用、学习、修改和按许可证要求分发；商业使用需取得授权。
