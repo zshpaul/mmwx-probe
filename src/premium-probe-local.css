@@ -1,104 +1,6 @@
 /* Fork-local overrides for the Premium theme. Kept out of premium-probe.css
    so upstream syncs never conflict with these styles. */
 
-/* ==== Premium overview v2: scan-first dashboard ==== */
-.premium-probe-hero-overview {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.premium-probe-overview-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.premium-probe-overview-heading > div {
-  min-width: 0;
-}
-
-.premium-probe-overview-heading > div > span {
-  display: block;
-  margin-bottom: 0.22rem;
-  color: #777064;
-  font-size: 0.58rem;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.premium-probe-overview-heading small {
-  color: #847c6d;
-  font-size: 0.66rem;
-}
-
-.premium-probe-kpis-expanded {
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 0.5rem;
-}
-
-.premium-probe-kpis-expanded > button,
-.premium-probe-kpis-expanded > .premium-probe-kpi-static {
-  display: flex;
-  min-width: 0;
-  min-height: 70px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0.28rem;
-  padding: 0.72rem 0.82rem;
-  border: 1px solid rgba(216, 180, 106, 0.16);
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.018);
-}
-
-.premium-probe-kpis-expanded > button {
-  cursor: pointer;
-}
-
-.premium-probe-kpis-expanded > button:hover {
-  border-color: rgba(242, 210, 139, 0.5);
-  background: rgba(216, 180, 106, 0.055);
-}
-
-.premium-probe-kpis-expanded strong {
-  overflow: hidden;
-  max-width: 100%;
-  color: #eee6d6;
-  font-size: clamp(1.15rem, 1.35vw, 1.5rem);
-  font-weight: 720;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.premium-probe-kpis-expanded span {
-  color: #8d8678;
-  font-size: 0.68rem;
-}
-
-.premium-probe-kpis-expanded button:nth-child(2) strong {
-  color: #72cf72;
-}
-
-.premium-probe-kpis-expanded button:nth-child(3) strong {
-  color: #ef6d74;
-}
-
-.premium-probe-kpi-static.is-attention strong {
-  color: #e2ad4b;
-}
-
-.premium-probe-kpi-static.is-speed strong {
-  color: #d9c78f;
-  font-size: clamp(0.98rem, 1.15vw, 1.25rem);
-}
-
-.premium-probe-overview-trends {
-  margin-top: 0.8rem;
-  border-top-color: rgba(216, 180, 106, 0.14);
-}
-
 .premium-probe-servers {
   margin-top: 1.1rem;
 }
@@ -337,8 +239,6 @@
   opacity: 0.72;
 }
 
-:root.light .premium-probe-overview-heading > div > span,
-:root.light .premium-probe-overview-heading small,
 :root.light .premium-probe-card-meta,
 :root.light .premium-probe-card-network span,
 :root.light .premium-probe-card-lifecycle span,
@@ -348,32 +248,9 @@
   color: #756b5c;
 }
 
-:root.light .premium-probe-kpis-expanded > button,
-:root.light .premium-probe-kpis-expanded > .premium-probe-kpi-static {
-  border-color: rgba(168, 124, 34, 0.2);
-  background: rgba(168, 124, 34, 0.025);
-}
-
-:root.light .premium-probe-kpis-expanded strong,
 :root.light .premium-probe-card-network strong,
 :root.light .premium-probe-card-traffic-summary > div strong {
   color: #2d261b;
-}
-
-:root.light .premium-probe-kpis-expanded button:nth-child(2) strong {
-  color: #1a7f37;
-}
-
-:root.light .premium-probe-kpis-expanded button:nth-child(3) strong {
-  color: #c0342c;
-}
-
-:root.light .premium-probe-kpi-static.is-attention strong {
-  color: #9b6b13;
-}
-
-:root.light .premium-probe-kpi-static.is-speed strong {
-  color: #75520f;
 }
 
 :root.light .premium-probe-card-network {
@@ -407,21 +284,6 @@
 }
 
 @media (max-width: 760px) {
-  .premium-probe-overview-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .premium-probe-kpis-expanded {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .premium-probe-kpis-expanded > button,
-  .premium-probe-kpis-expanded > .premium-probe-kpi-static {
-    min-height: 64px;
-    padding: 0.62rem 0.68rem;
-  }
 
   .premium-probe-card-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -458,9 +320,6 @@
 }
 
 @media (max-width: 420px) {
-  .premium-probe-kpis-expanded strong {
-    font-size: 1.05rem;
-  }
 
   .premium-probe-card-network strong {
     font-size: 0.67rem;
@@ -470,7 +329,6 @@
     gap: 0.45rem;
   }
 }
-
 
 /* ==== Premium metric detail values ==== */
 .premium-probe-resource.has-detail {
@@ -497,7 +355,6 @@
     font-size: 0.5rem;
   }
 }
-
 
 /* ==== Premium tri-ISP + secondary views refinement ==== */
 .premium-probe-tri-summary {
@@ -918,7 +775,6 @@
   }
 }
 
-
 /* ==== Dashboard polish (Komari / Nezha style status cues) ==== */
 .premium-probe-page {
   --pp-ok: #5fd38a;
@@ -944,32 +800,6 @@
 
 :root.theme-premium.light .premium-probe-watermarks {
   opacity: 0.22;
-}
-
-/* KPI tiles */
-:root.theme-premium .premium-probe-kpis-expanded > button,
-:root.theme-premium .premium-probe-kpis-expanded > .premium-probe-kpi-static {
-  border-radius: 0.8rem;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
-}
-
-:root.theme-premium .premium-probe-kpis-expanded > button:hover {
-  transform: translateY(-2px);
-}
-
-:root.theme-premium .premium-probe-kpis-expanded > button:nth-child(2) strong {
-  color: var(--pp-ok);
-}
-
-:root.theme-premium .premium-probe-kpis-expanded > button:nth-child(3) strong {
-  color: var(--pp-bad);
-}
-
-:root.theme-premium .premium-probe-kpis-expanded > .is-attention strong {
-  color: var(--pp-warn);
 }
 
 /* Server cards: single clean frame + status accent stripe */
@@ -1180,26 +1010,6 @@
 
 :root.theme-premium .premium-probe-card-lifecycle strong {
   font-size: 0.7rem;
-}
-
-/* Staggered entrance */
-@media (prefers-reduced-motion: no-preference) {
-  :root.theme-premium .premium-probe-card-grid > .premium-probe-server-card {
-    animation: pp-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  }
-
-  :root.theme-premium .premium-probe-card-grid > :nth-child(2) { animation-delay: 60ms; }
-  :root.theme-premium .premium-probe-card-grid > :nth-child(3) { animation-delay: 120ms; }
-  :root.theme-premium .premium-probe-card-grid > :nth-child(4) { animation-delay: 180ms; }
-  :root.theme-premium .premium-probe-card-grid > :nth-child(5) { animation-delay: 240ms; }
-  :root.theme-premium .premium-probe-card-grid > :nth-child(n + 6) { animation-delay: 300ms; }
-}
-
-@keyframes pp-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
 }
 
 @media (max-width: 420px) {

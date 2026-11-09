@@ -3447,7 +3447,10 @@ export function App() {
         <header className="topbar">
           <div>
             {data.logo && <img src={data.logo} alt="" />}
-            <h1>{title}</h1>
+            <div className="homepage-title">
+              <h1>{title}</h1>
+              <p>实时资源与网络状态</p>
+            </div>
           </div>
           <nav>
             <ThemeSwitch appearance={data.appearance} />

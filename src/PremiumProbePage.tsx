@@ -4,7 +4,6 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarClock,
-  CheckCircle2,
   ChevronRight,
   CreditCard,
   Globe2,
@@ -14,7 +13,6 @@ import {
   ShieldCheck,
   Target,
   X,
-  XCircle,
 } from "lucide-react";
 import { triISPRows } from "./tri-isp";
 import { CONN_COUNT_HINT, connCount, UnlockTabbedList } from "./App";
@@ -67,6 +65,7 @@ import { ThemeSwitch } from "./ThemeSwitch";
 import { PasskeyLogin } from "./PasskeyLogin";
 import "./premium-probe.css";
 import "./premium-probe-local.css";
+import "./homepage-premium.css";
 
 type ProbeData = ProbePayload;
 
@@ -236,12 +235,6 @@ type PremiumProbePageProps = {
 
 type StatusFilter = "all" | "online" | "offline";
 type PremiumProbeView = "card" | "network" | "resource";
-
-type TrendSample = {
-  label: string;
-  value: number;
-  formatted: string;
-};
 
 function StandaloneLicenseBadge({
   badge,
@@ -1104,238 +1097,6 @@ function SmartSummary({ servers }: { servers: ProbeServer[] }) {
         <strong>{parts.join("，")}。</strong>
       </div>
     </section>
-  );
-}
-
-function SpeedSnapshot({
-  label,
-  value,
-  samples,
-}: {
-  label: string;
-  value: string;
-  samples: TrendSample[];
-}) {
-  return (
-    <div className="premium-probe-speed-snapshot">
-      <div className="premium-probe-speed-heading">
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <InteractiveTrend samples={samples} />
-      <div className="premium-probe-speed-meta">
-        <small>逐次推送 · 秒级时间</small>
-        <small>{samples.length} 个实时采样点</small>
-      </div>
-    </div>
-  );
-}
-
-function chartPath(samples: number[], fixedCeiling?: number) {
-  if (!samples.length)
-    return { line: "", area: "", points: [], last: undefined };
-  const width = 260;
-  const height = 54;
-  const baseline = height - 3;
-  const ceiling = fixedCeiling || Math.max(...samples, 1) * 1.08;
-  const points = samples.map((sample, index) => ({
-    x: samples.length === 1 ? width : (index / (samples.length - 1)) * width,
-    y:
-      baseline -
-      (Math.min(ceiling, Math.max(0, sample)) / ceiling) * (height - 10),
-  }));
-  const line = points
-    .map(
-      (point, index) =>
-        `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
-    )
-    .join(" ");
-  return {
-    line,
-    area: `${line} L ${width} ${baseline} L ${points[0].x.toFixed(2)} ${baseline} Z`,
-    points,
-    last: points[points.length - 1],
-  };
-}
-
-function InteractiveTrend({
-  samples,
-  compact = false,
-  showArea = true,
-}: {
-  samples: TrendSample[];
-  compact?: boolean;
-  showArea?: boolean;
-}) {
-  const [activeIndex, setActiveIndex] = useState<number>();
-  const chart = chartPath(samples.map((sample) => sample.value));
-  const activeSample =
-    activeIndex === undefined ? undefined : samples[activeIndex];
-  const activePoint =
-    activeIndex === undefined ? undefined : chart.points[activeIndex];
-  const tooltipLeft = activePoint
-    ? Math.max(12, Math.min(88, (activePoint.x / 260) * 100))
-    : 50;
-
-  return (
-    <div
-      className={cn(
-        "premium-probe-speed-chart premium-probe-interactive-chart",
-        compact && "is-compact",
-      )}
-      onPointerMove={(event) => {
-        if (!samples.length) return;
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const ratio = Math.max(
-          0,
-          Math.min(1, (event.clientX - bounds.left) / bounds.width),
-        );
-        setActiveIndex(Math.round(ratio * (samples.length - 1)));
-      }}
-      onPointerLeave={() => setActiveIndex(undefined)}
-    >
-      <svg viewBox="0 0 260 54" preserveAspectRatio="none" aria-hidden="true">
-        <line x1="0" y1="51" x2="260" y2="51" />
-        {samples.length > 1 && showArea && (
-          <path className="is-area" d={chart.area} />
-        )}
-        {samples.length > 1 && <path className="is-line" d={chart.line} />}
-        {chart.last && !activePoint && (
-          <circle cx={chart.last.x} cy={chart.last.y} r="2.5" />
-        )}
-        {activePoint && (
-          <>
-            <line
-              className="is-cursor"
-              x1={activePoint.x}
-              y1="3"
-              x2={activePoint.x}
-              y2="51"
-            />
-            <circle cx={activePoint.x} cy={activePoint.y} r="3" />
-          </>
-        )}
-      </svg>
-      {activeSample && (
-        <div
-          className="premium-probe-chart-tooltip"
-          style={{ left: `${tooltipLeft}%` }}
-        >
-          <span>{activeSample.label}</span>
-          <strong>{activeSample.formatted}</strong>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DailyTrafficTrend({ servers }: { servers: ProbeServer[] }) {
-  const container = useRef<HTMLDivElement>(null);
-  const [visibleDays, setVisibleDays] = useState(7);
-  const allDays = useMemo(() => {
-    const totals = new Map<
-      string,
-      { date: string; uplink: number; downlink: number; total: number }
-    >();
-    for (const server of servers) {
-      for (const day of server.daily_traffic || []) {
-        const current = totals.get(day.date) || {
-          date: day.date,
-          uplink: 0,
-          downlink: 0,
-          total: 0,
-        };
-        current.uplink += day.uplink || 0;
-        current.downlink += day.downlink || 0;
-        current.total += day.total || day.uplink + day.downlink;
-        totals.set(day.date, current);
-      }
-    }
-    return [...totals.values()].sort((left, right) =>
-      left.date.localeCompare(right.date),
-    );
-  }, [servers]);
-
-  useEffect(() => {
-    const element = container.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => {
-      const count = Math.max(
-        7,
-        Math.min(18, Math.floor(entry.contentRect.width / 34)),
-      );
-      setVisibleDays(count);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  const days = allDays.slice(-visibleDays);
-  const latest = days[days.length - 1];
-  const samples = days.map((day, index) => ({
-    label: index === days.length - 1 ? `今日 ${day.date}` : day.date,
-    value: day.total,
-    formatted: formatTrafficCompact(day.total),
-  }));
-
-  return (
-    <div
-      ref={container}
-      className="premium-probe-overview-chart-card premium-probe-daily-trend"
-    >
-      <div className="premium-probe-overview-chart-heading">
-        <span>原始上下行日流量趋势</span>
-        <strong>
-          今日 {latest ? formatTrafficCompact(latest.total) : "—"}
-        </strong>
-      </div>
-      <InteractiveTrend samples={samples} />
-      <div className="premium-probe-speed-meta">
-        <small>{days[0]?.date.slice(5) || "暂无历史"}</small>
-        <small>
-          {latest ? `今日 ${latest.date.slice(5)} · ${days.length} 天` : ""}
-        </small>
-      </div>
-    </div>
-  );
-}
-
-function TrafficHotspots({ servers }: { servers: ProbeServer[] }) {
-  const ranked = servers
-    .map((server, index) => ({
-      server,
-      index,
-      speed: (server.download_speed || 0) + (server.upload_speed || 0),
-    }))
-    .sort((left, right) => right.speed - left.speed);
-  const total = ranked.reduce((sum, row) => sum + row.speed, 0);
-  const rows = ranked.slice(0, 5);
-
-  return (
-    <div className="premium-probe-overview-chart-card premium-probe-hotspots">
-      <div className="premium-probe-overview-chart-heading">
-        <span>实时流量热点</span>
-        <strong>{formatBitSpeed(total)}</strong>
-      </div>
-      <div className="premium-probe-hotspot-list">
-        {rows.map((row) => {
-          const share = total > 0 ? (row.speed / total) * 100 : 0;
-          return (
-            <div key={`${row.server.name || "server"}-${row.index}`}>
-              <Twemoji>{row.server.name || `#${row.index + 1}`}</Twemoji>
-              <i>
-                <b style={{ width: `${share}%` }} />
-              </i>
-              <strong>{share.toFixed(0)}%</strong>
-            </div>
-          );
-        })}
-      </div>
-      <div className="premium-probe-speed-meta">
-        <small>当前上下行带宽贡献</small>
-        <small>TOP {rows.length}</small>
-      </div>
-    </div>
   );
 }
 
@@ -3433,14 +3194,6 @@ export function PremiumProbePage({
 }: PremiumProbePageProps) {
   const servers = useMemo(() => data?.servers || [], [data?.servers]);
   const regions = useMemo(() => buildRegions(servers), [servers]);
-  const totalDownload = servers.reduce(
-    (total, server) => total + (server.download_speed || 0),
-    0,
-  );
-  const totalUpload = servers.reduce(
-    (total, server) => total + (server.upload_speed || 0),
-    0,
-  );
   const [status, setStatus] = useState<StatusFilter>("all");
   const [region, setRegion] = useState("all");
   const [serverRoute, setServerRoute] = useState(readServerDetailRoute);
@@ -3449,55 +3202,12 @@ export function PremiumProbePage({
     const saved = localStorage.getItem("premium-probe-view");
     return saved === "network" || saved === "resource" ? saved : "card";
   });
-  const sampledPayload = useRef<ProbeData | undefined>(undefined);
-  const [liveSpeedHistory, setLiveSpeedHistory] = useState<{
-    download: TrendSample[];
-    upload: TrendSample[];
-  }>({ download: [], upload: [] });
 
   useEffect(() => {
     const syncRoute = () => setServerRoute(readServerDetailRoute());
     window.addEventListener("hashchange", syncRoute);
     return () => window.removeEventListener("hashchange", syncRoute);
   }, []);
-
-  useEffect(() => {
-    if (!data || sampledPayload.current === data) return;
-    let cancelled = false;
-    const label = new Intl.DateTimeFormat("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    }).format(new Date());
-
-    queueMicrotask(() => {
-      if (cancelled || sampledPayload.current === data) return;
-      sampledPayload.current = data;
-      setLiveSpeedHistory((history) => ({
-        download: [
-          ...history.download.slice(-59),
-          {
-            label,
-            value: totalDownload,
-            formatted: formatBitSpeed(totalDownload),
-          },
-        ],
-        upload: [
-          ...history.upload.slice(-59),
-          {
-            label,
-            value: totalUpload,
-            formatted: formatBitSpeed(totalUpload),
-          },
-        ],
-      }));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [data, totalDownload, totalUpload]);
 
   if (!data && (isLoading || isError)) {
     return (
@@ -3509,14 +3219,7 @@ export function PremiumProbePage({
 
   const online = servers.filter((server) => server.online).length;
   const offline = servers.length - online;
-  const attention = servers.filter(
-    (server) => server.online && serverHealth(server).score < 75,
-  ).length;
   const showGlobe = data?.show_globe === true && regions.length > 0;
-  const showDailyTrend = data?.show_daily_trend !== false;
-  const showTrafficHotspots = data?.show_traffic_hotspots !== false;
-  const overviewModuleCount =
-    2 + Number(showDailyTrend) + Number(showTrafficHotspots);
   const insightVisibility = {
     traffic7D: data?.show_traffic_7d !== false,
     resourceHeatmap: data?.show_resource_heatmap !== false,
@@ -3646,86 +3349,6 @@ export function PremiumProbePage({
           />
         ) : (
           <>
-            <section
-              key="card"
-              className="premium-probe-hero premium-probe-hero-overview"
-            >
-              <article className="premium-probe-panel premium-probe-overview">
-                <div className="premium-probe-overview-heading">
-                  <div>
-                    <span>Infrastructure overview</span>
-                    <h2>
-                      <Server /> 服务器总览
-                    </h2>
-                  </div>
-                  <small>先看整体健康，再定位单机详情</small>
-                </div>
-
-                <div className="premium-probe-kpis premium-probe-kpis-expanded">
-                  <button type="button" onClick={() => selectStatus("all")}>
-                    <strong>{servers.length}</strong>
-                    <span>
-                      <Server /> 服务器
-                    </span>
-                  </button>
-                  <button type="button" onClick={() => selectStatus("online")}>
-                    <strong>{online}</strong>
-                    <span>
-                      <CheckCircle2 /> 在线
-                    </span>
-                  </button>
-                  <button type="button" onClick={() => selectStatus("offline")}>
-                    <strong>{offline}</strong>
-                    <span>
-                      <XCircle /> 离线
-                    </span>
-                  </button>
-                  {data?.show_health_score === true && (
-                    <div className="premium-probe-kpi-static is-attention">
-                      <strong>{attention}</strong>
-                      <span>
-                        <ShieldCheck /> 需关注
-                      </span>
-                    </div>
-                  )}
-                  <div className="premium-probe-kpi-static is-speed">
-                    <strong>{formatBitSpeed(totalDownload)}</strong>
-                    <span>总下行</span>
-                  </div>
-                  <div className="premium-probe-kpi-static is-speed">
-                    <strong>{formatBitSpeed(totalUpload)}</strong>
-                    <span>总上行</span>
-                  </div>
-                  <button type="button" onClick={clearFilters}>
-                    <strong>{regions.length}</strong>
-                    <span>
-                      <Globe2 /> 地区
-                    </span>
-                  </button>
-                </div>
-
-                <div
-                  className={cn(
-                    "premium-probe-network-grid premium-probe-overview-trends",
-                    `has-${overviewModuleCount}-modules`,
-                  )}
-                >
-                  <SpeedSnapshot
-                    label="总下行实时趋势"
-                    value={formatBitSpeed(totalDownload)}
-                    samples={liveSpeedHistory.download}
-                  />
-                  <SpeedSnapshot
-                    label="总上行实时趋势"
-                    value={formatBitSpeed(totalUpload)}
-                    samples={liveSpeedHistory.upload}
-                  />
-                  {showDailyTrend && <DailyTrafficTrend servers={servers} />}
-                  {showTrafficHotspots && <TrafficHotspots servers={servers} />}
-                </div>
-              </article>
-            </section>
-
             <section className="premium-probe-servers">
               <div className="premium-probe-section-heading">
                 <h2>
@@ -3751,6 +3374,7 @@ export function PremiumProbePage({
                 <label>
                   <Globe2 />
                   <select
+                    aria-label="地区筛选"
                     value={region}
                     onChange={(event) => selectRegion(event.target.value)}
                   >

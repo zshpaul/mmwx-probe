@@ -200,8 +200,6 @@ export interface ProbePayload {
   enabled: boolean;
   forward?: ForwardChainData[];
   show_globe?: boolean;
-  show_daily_trend?: boolean;
-  show_traffic_hotspots?: boolean;
   show_traffic_7d?: boolean;
   show_resource_heatmap?: boolean;
   show_traffic_quota?: boolean;
