@@ -226,6 +226,12 @@ git push -u origin main
 
 提交前确认 `.dev.vars`、`wrangler.local.jsonc`、`node_modules/` 和 `dist/` 未被纳入版本控制。
 
+## 采样与地球交互
+
+首页延迟、丢包采样条使用 `/api/series?server=N&range=1h&all=1` 的完整数据与时间元数据，不混用 `/api/probe` 的无时间桶。卡片、列表与弹窗按节点及时间范围共享内存缓存，每个节点首次增加一次 1H 请求，最多并发 3 个。成功后按 `max(60, bucket_sec)` 秒刷新，失败后 60 秒重试；页面隐藏时暂停新请求，已发出的请求可完成。1H 卡片与弹窗不重复请求，切换其他时间范围会独立缓存。色块按时间等分、提示段首的浏览器本地时间；缺值为 `N/A`，请求失败显示“加载失败”。列表保留三网摘要，弹窗保留历史折线，不额外增加色块布局。
+
+地球自动旋转以 Emerald 每帧 `0.002` 弧度为基准按 60Hz 换算，拖动、后台页面及 `prefers-reduced-motion: reduce` 时暂停；键盘方向键旋转及可见焦点仍可用。
+
 ## 许可证
 
 当前页面设计适配自 Emerald（MIT），固定版本见“Emerald 展示约定”。保留的基础样式曾适配自 Nezha 默认前端 `nezhahq/user-frontend-backup`（源自 `hamster1963/nezha-dash-v2`），固定提交 `1dd038bea8f6c5143c3e8fb4077fead24994fe4e`，Apache-2.0。全部署名与改动说明见 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)，完整许可随静态产物一起分发。未使用其商标 logo。

@@ -37,7 +37,7 @@ export function ServerCard({ server, index, now, tri, onPing }: { server: ProbeS
         {(isNumber(server.upload_speed) || isNumber(server.download_speed)) && <div className="fact-row"><span>速率</span><i /><span className="speed-pair"><span className="upload"><ChevronUp size={12} />{speed(server.upload_speed)}</span><span className="download"><ChevronDown size={12} />{speed(server.download_speed)}</span></span></div>}
         {isNumber(server.uptime) && <div className="fact-row"><span>在线</span><i /><span>{uptime(server.uptime)}</span></div>}
         {(price || remaining) && <div className="fact-row"><span>费用</span><i /><span title={remaining?.title}>{price && `${price.value}${price.unit ? ` ${price.unit}` : ""}`}{price && remaining && " · "}{remaining && <span className={remaining.tone}>{remaining.value}{remaining.unit && ` ${remaining.unit}`}</span>}</span></div>}
-        <EmeraldPingSummary server={server} tri={tri} onOpen={onPing} />
+        <EmeraldPingSummary server={server} index={index} tri={tri} onOpen={onPing} />
       </div>
     </div>
   </article>;

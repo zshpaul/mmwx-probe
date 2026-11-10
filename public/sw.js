@@ -1,4 +1,4 @@
-const CACHE_NAME = "mmwx-probe-pwa-v4";
+const CACHE_NAME = "mmwx-probe-pwa-v5";
 const APP_SHELL = [
   "/",
   "/manifest.json",

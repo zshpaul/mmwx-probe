@@ -7,6 +7,7 @@ function check(condition: unknown, message: string) {
 async function verify() {
   const originalFetch = globalThis.fetch;
   const target = { label: "电信", buckets: [{ ms: 42, loss: 0 }], current_ms: 42, loss_pct: 0 };
+  const timing = { generated_at: 36000, bucket_sec: 300 };
   try {
     globalThis.fetch = (async (input, options) => {
       const url = new URL(String(input), "https://probe.example");
@@ -14,18 +15,18 @@ async function verify() {
       check(url.searchParams.get("all") === "1", "All-target history must explicitly request all=1");
       check(url.searchParams.get("server") === "2", "Selected server must be retained");
       check(options?.cache === "no-store" && !!options.signal, "History must keep cancellation and no-store");
-      return Response.json({ success: true, series: target, ...(url.searchParams.get("all") === "1" ? { all_series: [target] } : {}) });
+      return Response.json({ ...timing, success: true, series: target, ...(url.searchParams.get("all") === "1" ? { all_series: [target] } : {}) });
     }) as typeof fetch;
     for (const range of ["1h", "6h", "12h", "24h"] as const) {
       const result = await fetchPingHistory(2, range, new AbortController().signal);
       check(result.all_series?.length === 1 && result.all_series[0].label === "电信", "Prefer target series without duplicating aggregate");
     }
-    globalThis.fetch = (async () => Response.json({ success: true, series: target })) as typeof fetch;
+    globalThis.fetch = (async () => Response.json({ ...timing, success: true, series: target })) as typeof fetch;
     const aggregate = await fetchPingHistory(2, "1h", new AbortController().signal);
     check(aggregate.all_series?.[0].key === "__avg__" && aggregate.all_series[0].buckets[0].ms === 42, "Support main's aggregate-only response without fabricating data");
-    globalThis.fetch = (async () => Response.json({ success: true, all_series: [] })) as typeof fetch;
+    globalThis.fetch = (async () => Response.json({ ...timing, success: true, all_series: [] })) as typeof fetch;
     check((await fetchPingHistory(2, "1h", new AbortController().signal)).all_series?.length === 0, "Empty history is valid");
-    for (const invalid of [null, {}, { success: false }, { all_series: [null] }, { all_series: [{ buckets: [{}] }] }]) {
+    for (const invalid of [null, {}, { success: false }, { all_series: [null] }, { all_series: [{ buckets: [{}] }] }, { all_series: [target] }, { ...timing, bucket_sec: 0, all_series: [target] }]) {
       globalThis.fetch = (async () => Response.json(invalid)) as typeof fetch;
       let failed = false;
       try { await fetchPingHistory(2, "1h", new AbortController().signal); } catch { failed = true; }

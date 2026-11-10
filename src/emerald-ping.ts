@@ -14,11 +14,14 @@ export function pingTone(value: number | undefined, metric: "latency" | "loss") 
   const level = thresholds.findIndex(threshold => value <= threshold);
   return `level-${level < 0 ? 4 : level}`;
 }
-export function pingSummary(series: ProbePingSeries[]) {
+export function pingSummary(series: ProbePingSeries[], timing?: Pick<PingResponse, "generated_at" | "bucket_sec">) {
   const count = Math.max(0, ...series.map(item => item.buckets?.length || 0));
+  const bucket = timing?.bucket_sec;
+  const endTime = validLatency(timing?.generated_at) && validLatency(bucket) && bucket > 0 ? Math.floor(timing.generated_at / bucket) * bucket : undefined;
   const points = Array.from({ length: count }, (_, index) => {
     const buckets = series.map(item => item.buckets?.[index - (count - (item.buckets?.length || 0))]);
     return {
+      time: endTime === undefined ? undefined : endTime - (count - 1 - index) * bucket!,
       latency: average(buckets.map(point => point && validLatency(point.ms) && validLoss(point.loss) && point.loss < 100 ? point.ms : undefined)),
       loss: average(buckets.map(point => point && validLoss(point.loss) ? point.loss : undefined)),
     };
@@ -27,16 +30,28 @@ export function pingSummary(series: ProbePingSeries[]) {
   const bars = Array.from({ length: barCount }, (_, index) => {
     const start = Math.floor(index * count / barCount);
     const end = Math.floor((index + 1) * count / barCount);
-    const segment = points.slice(start, end);
-    return { start, end, latency: average(segment.map(point => point.latency)), loss: average(segment.map(point => point.loss)) };
+    const firstTime = points[0]?.time;
+    const lastTime = points.at(-1)?.time;
+    const size = firstTime === undefined || lastTime === undefined ? undefined : Math.max(.001, (lastTime - firstTime) / barCount);
+    const time = size === undefined ? undefined : firstTime! + index * size;
+    const segmentEnd = size === undefined ? undefined : index === barCount - 1 ? lastTime! + .001 : time! + size;
+    const segment = time === undefined ? points.slice(start, end) : points.filter(point => point.time! >= time && point.time! < segmentEnd!);
+    return { start, end, time, latency: average(segment.map(point => point.latency)), loss: average(segment.map(point => point.loss)) };
   });
   return { bars, latency: average(points.map(point => point.latency)), loss: average(points.map(point => point.loss)) };
+}
+export function pingSampleTooltip(time: number | undefined, value: number | undefined, metric: "latency" | "loss") {
+  const date = time === undefined ? undefined : new Date(time * 1000);
+  const label = date && Number.isFinite(date.getTime()) ? [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, "0")).join(":") : undefined;
+  if (!label) return "时间未知";
+  return value === undefined ? `${label} N/A` : `${label}\n${metric === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`}`;
 }
 export type PingResponse = { success?: boolean; generated_at?: number; bucket_sec?: number; buckets?: number; series?: ProbePingSeries; all_series?: ProbePingSeries[] };
 export async function fetchPingHistory(index: number, range: DetailRange, signal: AbortSignal): Promise<PingResponse> {
   const body = await requestJson<PingResponse>(`/api/series?server=${index}&range=${requestRange(range)}&all=1`, { signal, cache: "no-store" });
   const series = body?.all_series ?? (body?.series ? [{ ...body.series, key: "__avg__", label: "平均" }] : undefined);
   if (!body || body.success === false || !Array.isArray(series) || series.some(item => !item || !Array.isArray(item.buckets) || item.buckets.some(point => !point || typeof point.ms !== "number" || typeof point.loss !== "number"))) throw new Error("Invalid ping history");
+  if (!validLatency(body.generated_at) || !validLatency(body.bucket_sec) || body.bucket_sec === 0) throw new Error("Missing ping timing");
   return { ...body, all_series: series };
 }
 export function pingHistoryRows(response: PingResponse | undefined, hours: number) {

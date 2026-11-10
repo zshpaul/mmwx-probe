@@ -11,6 +11,7 @@ import { financeSummary, speed } from "./emerald-model";
 import { RegionFlag } from "./ServerSymbols";
 import { layoutGlobeLabels } from "./globe-labels";
 import { arcPath, sampleArc } from "./globe-arcs";
+import { globeRotationStep } from "./globe-motion";
 
 const world = atlas as unknown as Topology;
 const land = feature(world, world.objects.land);
@@ -42,9 +43,28 @@ function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visito
   const projection = geoOrthographic().rotate(rotation).scale(174).translate([224, 224]);
   const center: [number, number] = [-rotation[0], -rotation[1]];
   useEffect(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => { if (!dragging.current && document.visibilityState === "visible") setRotation(([longitude, latitude]) => [longitude - .15, latitude]); }, 120);
-    return () => window.clearInterval(timer);
+    const preference = matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    let previous: number | undefined;
+    const animate = (time: number) => {
+      const step = globeRotationStep(previous === undefined ? 0 : time - previous, dragging.current, preference.matches, document.visibilityState === "visible");
+      previous = time;
+      if (step) setRotation(([longitude, latitude]) => [(longitude - step) % 360, latitude]);
+      frame = requestAnimationFrame(animate);
+    };
+    const sync = () => {
+      cancelAnimationFrame(frame);
+      previous = undefined;
+      if (!preference.matches && document.visibilityState === "visible") frame = requestAnimationFrame(animate);
+    };
+    preference.addEventListener("change", sync);
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => {
+      cancelAnimationFrame(frame);
+      preference.removeEventListener("change", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
   }, []);
   const clusters = useMemo(() => {
     const grouped = new Map<string, ProbeServer[]>();
@@ -73,17 +93,17 @@ function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visito
   return <div className="fleet-globe">
     <svg viewBox="0 0 448 448" role="img" aria-label="节点地区地球；国家级示意，不标注精确机房坐标，可拖动旋转" tabIndex={0}
       onKeyDown={event => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) { event.preventDefault(); setRotation(([longitude, latitude]) => [longitude + (event.key === "ArrowLeft" ? -8 : event.key === "ArrowRight" ? 8 : 0), Math.max(-65, Math.min(65, latitude + (event.key === "ArrowUp" ? 8 : event.key === "ArrowDown" ? -8 : 0)))]); } }}
-      onPointerDown={event => { dragging.current = true; position.current = [event.clientX, event.clientY]; event.currentTarget.setPointerCapture(event.pointerId); }}
+      onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); dragging.current = true; position.current = [event.clientX, event.clientY]; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={event => { if (!dragging.current) return; const previous = position.current; position.current = [event.clientX, event.clientY]; setRotation(([longitude, latitude]) => [longitude + (event.clientX - previous[0]) / 2, Math.max(-65, Math.min(65, latitude - (event.clientY - previous[1]) / 3))]); }}
-      onPointerUp={event => { dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={() => { dragging.current = false; }}>
+      onPointerUp={event => { dragging.current = false; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={() => { dragging.current = false; }} onLostPointerCapture={() => { dragging.current = false; }}>
       <defs><radialGradient id={`${identifier}-sphere`} cx="40%" cy="35%"><stop stopColor="var(--globe-center)" /><stop offset=".83" stopColor="var(--globe-edge)" /><stop offset="1" stopColor="var(--globe-rim)" /></radialGradient><clipPath id={`${identifier}-labels`}><rect width="448" height="250" /></clipPath></defs>
       <circle cx="224" cy="224" r="176" fill={`url(#${identifier}-sphere)`} className="globe-sphere" />
       <path d={path} stroke="var(--globe-ink)" strokeWidth="1.5" strokeLinecap="round" />
-      <g className="globe-arcs" fill="none" strokeWidth={0.8} pointerEvents="none">{arcs.map(arc => <path key={arc.code} d={arc.path}><title>节点国家至访客国家的示意连线</title></path>)}</g>
+      <g className="globe-arcs" fill="none" strokeWidth={1.6} strokeLinecap="round" pointerEvents="none">{arcs.map(arc => <path key={arc.code} d={arc.path}><title>节点国家至访客国家的示意连线</title></path>)}</g>
       <g className="globe-labels" clipPath={`url(#${identifier}-labels)`}>{visible.map(cluster => {
         const onlineNodes = cluster.nodes.filter(server => server.online);
         const label = labels.find(label => label.code === cluster.code);
-        return <g key={cluster.code}><title>{`${cluster.nodes[0].region_name || cluster.code} · ${cluster.nodes.length} 台；国家级示意位置`}</title><circle cx={cluster.x} cy={cluster.y} r="3" fill={onlineNodes.length ? "#059669" : "#d97706"} />{label && <foreignObject x={label.x} y={label.y} width={label.width} height={label.height}><div className="globe-rate" title="在线节点已上报速率合计"><span className="upload">⌃ {speed(sum(onlineNodes.map(server => server.upload_speed)))}</span><span className="download">⌄ {speed(sum(onlineNodes.map(server => server.download_speed)))}</span></div><RegionFlag server={cluster.nodes[0]} /></foreignObject>}</g>;
+        return <g key={cluster.code}><title>{`${cluster.nodes[0].region_name || cluster.code} · ${cluster.nodes.length} 台；国家级示意位置`}</title><circle cx={cluster.x} cy={cluster.y} r="3" fill={onlineNodes.length ? "#059669" : "#d97706"} />{label && <foreignObject x={label.x} y={label.y} width={label.width} height={label.height}><div className="globe-rate" title="在线节点已上报速率合计"><span className="upload"><ChevronUp size={12} />{speed(sum(onlineNodes.map(server => server.upload_speed)))}</span><span className="download"><ChevronDown size={12} />{speed(sum(onlineNodes.map(server => server.download_speed)))}</span></div><RegionFlag server={cluster.nodes[0]} /></foreignObject>}</g>;
       })}</g>
     </svg>
     <div className="fleet-status" title={`${online} 在线 · ${servers.length - online} 离线`}><span className="positive">● {online}</span><span className="warning">● {servers.length - online}</span></div>

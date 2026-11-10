@@ -48,7 +48,7 @@ export function ServerList({ nodes, tri, onPing }: { nodes: { server: ProbeServe
       <Metric label="硬盘" value={ratio(server.disk_used, server.disk_total)} title={`${bytes(server.disk_used)} / ${bytes(server.disk_total)}`} />
       <Metric label="流量" value={ratio(billableTraffic(server), server.traffic_limit)} title={`${trafficUsageLabel(server)}：${bytes(billableTraffic(server))}${server.traffic_limit ? ` / ${bytes(server.traffic_limit)}` : ""}`} />
       <span className="table-speed"><span className="upload"><ChevronUp size={12} />{speed(server.upload_speed)}</span><span className="download"><ChevronDown size={12} />{speed(server.download_speed)}</span></span>
-      <button className="table-ping" aria-label={`${server.name || "节点"} 三网延迟`} onClick={() => onPing(index)}><EmeraldPingSummary server={server} tri={tri} onOpen={() => onPing(index)} compact /></button>
+      <button className="table-ping" aria-label={`${server.name || "节点"} 三网延迟`} onClick={() => onPing(index)}><EmeraldPingSummary server={server} index={index} tri={tri} onOpen={() => onPing(index)} compact /></button>
     </div>)}
   </div>;
 }
