@@ -4,6 +4,7 @@ import type { ProbeServer } from "./types";
 import { OsIcon, RegionFlag } from "./ServerSymbols";
 import { PingHistory } from "./EmeraldPing";
 import { billableTraffic, trafficUsageLabel } from "./traffic-display";
+import { requestJson } from "./request-json";
 import { bytes, detailRanges, historyRows, isNumber, percent, priceCards, ratio, requestRange, speed, uptime, type DetailRange, type SystemResponse } from "./emerald-model";
 const Trend = lazy(() => import("./Trend"));
 type InfoItem = { label: string; value?: ReactNode; icon: LucideIcon; wide?: boolean; title?: string; progress?: number; aside?: string };
@@ -29,11 +30,9 @@ export function ServerDetails({ server, index, updatedAt }: { server: ProbeServe
       if (pending) return;
       pending = true;
       try {
-        const response = await fetch(`/api/series?server=${index}&range=${requestRange(range)}&metric=system`, {
-          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]), cache: "no-store",
+        const body = await requestJson<SystemResponse>(`/api/series?server=${index}&range=${requestRange(range)}&metric=system`, {
+          signal: controller.signal, cache: "no-store",
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const body = await response.json() as SystemResponse;
         if (!body || body.success === false || !body.series || typeof body.series !== "object" || Object.values(body.series).some(points => points !== undefined && (!Array.isArray(points) || points.some(point => !point || typeof point.t !== "number")))) throw new Error("历史响应格式无效");
         if (!controller.signal.aborted) { setHistory(body); setError(undefined); }
       } catch {

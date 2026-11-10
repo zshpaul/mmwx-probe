@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const clients = new Set();
 let stream = true;
@@ -60,7 +62,7 @@ function frame(text, opcode = 1) {
   if (body.length >= 126) header.writeUInt16BE(body.length, 2);
   return Buffer.concat([header, body]);
 }
-function series(url) {
+export function series(url) {
   const range = url.searchParams.get("range") || "1h";
   const days = parseInt(range);
   const bucket = range === "1h" ? 300 : range === "6h" ? 600 : range === "24h" ? 1800 : days <= 3 ? 3600 : 7200;
@@ -79,17 +81,26 @@ function series(url) {
       upload_speed: points(1800000, 600000), download_speed: points(3300000, 1200000),
     },
   };
-  return {
-    ...meta,
-    all_series: ["电信 · 上海", "联通 · 北京", "移动 · 广州"].map((label, line) => ({
+  const targets = ["电信 · 上海", "联通 · 北京", "移动 · 广州"].map((label, line) => ({
       key: `target-${line}`, label, current_ms: 34 + line * 12, loss_pct: 0,
       buckets: Array.from({ length: count }, (_, index) => ({
         ms: 28 + line * 17 + Math.sin(index * 0.6 + line) * 6 + (index % 3) * 3,
         loss: index % 9 === line + 3 ? 2.5 + line : 0,
       })),
-    })),
+    }));
+  return {
+    ...meta,
+    series: {
+      label: "平均", current_ms: targets.reduce((total, target) => total + target.current_ms, 0) / targets.length, loss_pct: 0,
+      buckets: Array.from({ length: count }, (_, index) => ({
+        ms: targets.reduce((total, target) => total + target.buckets[index].ms, 0) / targets.length,
+        loss: targets.reduce((total, target) => total + target.buckets[index].loss, 0) / targets.length,
+      })),
+    },
+    ...(url.searchParams.get("all") === "1" ? { all_series: targets } : {}),
   };
 }
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, "http://localhost");
   const json = (body, status = 200) => {
@@ -139,3 +150,4 @@ setInterval(() => {
   if (!silent) for (const socket of clients) socket.write(frame(JSON.stringify(payload())));
 }, 2000).unref();
 server.listen(8788, "127.0.0.1", () => console.log("Mock probe listening on http://127.0.0.1:8788 (local fixtures only)"));
+}

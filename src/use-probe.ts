@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ProbeAppearance, ProbePayload, ThemeName } from "./types";
 import { normalizeColorMode, type ProbeColorMode } from "./theme-preference";
+import { requestJson } from "./request-json";
 
 const APPEARANCE_CACHE = "mmwx-probe-appearance";
 const COLOR_MODE_PREFERENCE = "mmwx-probe-color-mode";
@@ -95,9 +96,7 @@ export function useProbe(): { data?: ProbePayload; error?: string; connection: "
       pending = true;
       const startedAt = Date.now();
       try {
-        const response = await fetch("/api/probe", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = (await response.json()) as ProbePayload;
+        const payload = await requestJson<ProbePayload>("/api/probe", { cache: "no-store", signal: controller.signal });
         if (lastFrame <= startedAt) {
           accept(payload);
           if (!stopped) setConnection("polling");

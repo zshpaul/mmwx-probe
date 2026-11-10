@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { ProbePayload, ProbeServer } from "./types";
 import { triISPRows } from "./tri-isp";
-import { detailRanges, requestRange, type DetailRange } from "./emerald-model";
-import { average, pingHistoryRows, pingSummary, pingTone, smoothPingRows, validLatency, validLoss, type PingResponse } from "./emerald-ping";
+import { detailRanges, type DetailRange } from "./emerald-model";
+import { average, fetchPingHistory, pingHistoryRows, pingSummary, pingTone, smoothPingRows, validLatency, validLoss, type PingResponse } from "./emerald-ping";
 
 const Trend = lazy(() => import("./Trend"));
 const colors = ["#FF6B6B", "#4ECDC4", "#A78BFA", "#60A5FA", "#FFB347"];
@@ -48,10 +48,7 @@ export function PingHistory({ server, index }: { server: ProbeServer; index: num
       if (pending) return;
       pending = true;
       try {
-        const result = await fetch(`/api/series?server=${index}&range=${requestRange(range)}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]), cache: "no-store" });
-        if (!result.ok) throw new Error();
-        const body = await result.json() as PingResponse;
-        if (body.success === false || !Array.isArray(body.all_series) || body.all_series.some(series => !Array.isArray(series.buckets) || series.buckets.some(point => !point || typeof point.ms !== "number" || typeof point.loss !== "number"))) throw new Error();
+        const body = await fetchPingHistory(index, range, controller.signal);
         if (!controller.signal.aborted) { setResponse(body); setError(undefined); }
       } catch {
         if (!controller.signal.aborted) setError("延迟历史加载失败，稍后自动重试");

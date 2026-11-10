@@ -44,7 +44,7 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 
 - 三网值复用 `tri_isp` 配置与 `ping[].isp` 映射，不拿任意三个目标冒充运营商；缺失运营商显示 `—`。
 - 两条采样条遵循 Emerald `useNodePingDisplay` 的等高色块语义：上报目标同槽位均值，再按顺序分成最多十段，颜色表示段内平均延迟/丢包；摘要为有效采样均值。延迟阈值为 60/120/180/240 ms，丢包阈值为 1/3/6/9%。100% 丢包不当作有效延迟，缺测保留灰色；`buckets` 没有时刻，tooltip 只标采样序号，不编造“一小时”或时间戳。
-- 延迟历史使用 `/api/series` 的 `all_series`、`generated_at`、`bucket_sec`、`buckets`；提供范围切换、目标全选/全不选、延迟/丢包开关和 tooltip。平滑采用 EWMA α=0.3，保留缺测断点，不补造原始样本；关闭即可查看原始值。
+- 延迟历史使用 `/api/series?server=…&range=…&all=1` 的 `all_series`、`generated_at`、`bucket_sec`、`buckets`；兼容仅返回聚合 `series` 的响应，优先使用完整目标，不重复加入平均曲线。参数与字段依据本仓 `main` 的调用方式，未对照后端源码实机确认。提供范围切换、目标全选/全不选、延迟/丢包开关和 tooltip。平滑采用 EWMA α=0.3，保留缺测断点，不补造原始样本；关闭即可查看原始值。
 - 总览资源/速率只汇总在线有效上报值，累计流量使用 `cumulative_up/down`；没有累计计数时明确显示“计费流量”，按各节点自身计费周期合计。剩余价值从价格/周期/到期时间推导，缺项排除；价值弹窗按币种分别汇总，不请求或假造汇率。
 - 地球使用国家级地理示意位置并显示实际地区聚合速率；可自动旋转、拖动和键盘旋转，尊重减少动画偏好。桌面端速率标签绘制限于总览区，卡片与工具栏位于球体前方，避免遮挡节点标题和点击；球体保持完整外观。
 - Emerald `NodeEarthGlobe.vue` 的弧线由 COBE 绘制（`arcWidth: 0.8`、`arcHeight: 0.4`）：`from` 为每个节点国家聚合点，`to` 为访客国家代表坐标，并非节点互连或精确城市路径。这里将相同连接规则适配到现有 SVG 地球：复用国家代表坐标，线宽 0.8、沿大圆抬升系数 0.4，背面遮挡段不绘制。访客国家来自 `/api/visitor`；缺失或无法映射坐标时返回空连线，不使用 hub 或虚构位置。
@@ -56,7 +56,9 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 
 `GET /api/visitor` 在 `worker/index.ts` 独立路由到 `worker/visitor.ts`，不代理主控、不要求 `PROBE_TOKEN`、不请求任何第三方。只读取 Cloudflare 注入的 `request.cf.country/city/region` 和 `CF-Connecting-IP`，返回 `{ countryCode, city, region, maskedIp }`；缺失或无效值为空字符串。响应（包括 405）使用 `Cache-Control: private, no-store`，只接受 GET。IPv4 校验后遮盖第三段（星号数等于原段位数）；IPv6 校验并展开后仅保留前四段，后四段整体替换为 `*`，包括压缩与 IPv4 映射形式。接口不返回也不记录原始 IP，不读取其他 IP 转发头。
 
-`VisitorInfo.tsx` 只请求这个同源接口；国家名称在前端由国家码转换，城市缺失回退到地区，完全未知时显示“网络访客 / 暂无法获取”。浏览器由 `navigator.userAgent` 本地识别。悬浮条没有显示完整 IP 的入口。访客国家只用于国家级示意连线，不代表精确位置或真实网络链路；监控指标仍来自原有 `/api/probe`、`/api/series`、`/api/stream`。
+`VisitorInfo.tsx` 只请求这个同源接口；国家名称在前端由国家码转换，城市缺失回退到地区，成功响应但字段完全未知时显示“网络访客 / 暂无法获取”；请求失败或超时只隐藏访客条，不影响其他页面。浏览器由 `navigator.userAgent` 本地识别。悬浮条没有显示完整 IP 的入口。访客国家只用于国家级示意连线，不代表精确位置或真实网络链路；监控指标仍来自原有 `/api/probe`、`/api/series`、`/api/stream`。
+
+监控轮询、系统历史、延迟历史及访客请求共用 `request-json.ts`：通过 `AbortController` 转发取消、`setTimeout` 实现超时，不依赖 `AbortSignal.any/timeout`。超时覆盖响应体读取，结束后清理计时器和监听器；同步 fetch 异常也转为可捕获的 Promise 拒绝。
 
 本地开发没有 Cloudflare 元数据时，空字段和无弧线是预期结果；截图可用明确标注的本地 mock。以后迁移自有服务器可保留接口契约，但应替换元数据来源（受信反代头或本地 GeoIP 数据库），不能把任意客户端提交的转发头当作可信定位。
 
@@ -182,10 +184,13 @@ WebSocket 收到有效帧时优先使用实时数据；断线后立即回退 HTT
 ```bash
 npm run dev        # 启动 Vite 开发服务器
 npm run typecheck  # TypeScript 类型检查
+npm test           # 全部前端断言和严格 mock 协议回归测试
 npm run build      # 生成 dist 生产文件
 npm run preview    # 本地预览生产构建
 npm run deploy     # 构建并部署到 Cloudflare Workers
 ```
+
+CI 执行 `npm ci`、`npm run typecheck`、`npm test`、`npm run build`。测试入口 `scripts/test.mjs` 使用锁定依赖将 `src/*.test.ts(x)` 打包到独立临时目录并逐项执行，再执行 `scripts/*.test.mjs`；失败或超时返回非零状态，结束后清理本次测试临时目录。`scripts/mock-probe.mjs` 仅在 `all=1` 时返回 `all_series`，默认返回聚合 `series`，防止 mock 掩盖请求参数回归。
 
 ## 更新与密钥轮换
 
