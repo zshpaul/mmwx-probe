@@ -35,13 +35,19 @@ equal(
   "顺序即展示顺序,必须与主控一致",
 );
 
-equal(triISPRows(undefined, series), [], "未配置时返回空,调用方走原有展示");
+const inferred = [
+  { isp: "telecom", label: "电信" },
+  { isp: "unicom", label: "联通", series: series[1] },
+  { isp: "mobile", label: "移动" },
+];
+equal(triISPRows(undefined, series), inferred, "未配置时从运营商名称识别，缺失运营商保留空行");
 equal(
   triISPRows({ enabled: false, targets: tri.targets }, series),
-  [],
-  "开关关闭时返回空",
+  inferred,
+  "没有启用配置时仍兼容旧版运营商自动识别",
 );
-equal(triISPRows({ enabled: true, targets: [] }, series), [], "没有槽位时返回空");
+equal(triISPRows({ enabled: true, targets: [] }, series), inferred, "没有槽位时自动识别");
+equal(triISPRows(undefined, []), [], "没有配置和采样时返回空");
 
 // 序列里没有 key 的条目(平均态)不能顶替任何槽位 —— 顶替了就是把平均值标成某个运营商。
 equal(
@@ -71,8 +77,8 @@ const fallbackRows = triISPRows<ProbePingSeries>(zjTri, [
 ]);
 equal(
   fallbackRows.map((r) => r.label),
-  ["广州移动", "北京电信", "成都电信"],
-  "兜底按主控标的配置顺序取前三个",
+  ["电信", "联通", "移动"],
+  "目标key失效时优先识别运营商，而不是按任意目标顺序补齐",
 );
 equal(
   new Set(fallbackRows.map((r) => r.isp)).size,
@@ -85,6 +91,14 @@ equal(
     { key: "a", label: "A", current_ms: 1, loss_pct: 0, buckets: [] },
     { key: "b", label: "B", current_ms: 2, loss_pct: 0, buckets: [] },
   ]).map((r) => r.label),
-  ["A", "B"],
-  "旧主控没标时按下发顺序取,平均态不参与",
+  ["浙江电信", "浙江联通", "浙江移动"],
+  "无法识别且没有明确兜底标记时保留配置槽位，不能把任意目标冒充三网",
+);
+equal(
+  triISPRows(zjTri, [
+    { key: "a", label: "A", tri_fallback: 2 },
+    { key: "b", label: "B", tri_fallback: 1 },
+  ]).map(row => row.label),
+  ["B", "A"],
+  "无法识别运营商时才按明确兜底标记排序",
 );

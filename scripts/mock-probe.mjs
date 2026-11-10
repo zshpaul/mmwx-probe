@@ -10,6 +10,7 @@ let empty = false;
 let disabled = false;
 let historyFailure = false;
 let revision = 0;
+let frozen = false;
 const requests = [];
 const gib = 1024 ** 3;
 const locations = [
@@ -96,6 +97,7 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify(body));
   };
   if (url.pathname === "/__qa/control" && request.method === "POST") {
+    frozen = url.searchParams.get("freeze") === "1";
     stream = url.searchParams.get("stream") !== "off";
     silent = url.searchParams.get("silent") === "1";
     failure = url.searchParams.get("failure") === "1";
@@ -133,7 +135,7 @@ server.on("upgrade", (request, socket) => {
   socket.on("error", () => clients.delete(socket));
 });
 setInterval(() => {
-  revision++;
+  if (!frozen) revision++;
   if (!silent) for (const socket of clients) socket.write(frame(JSON.stringify(payload())));
 }, 2000).unref();
 server.listen(8788, "127.0.0.1", () => console.log("Mock probe listening on http://127.0.0.1:8788 (local fixtures only)"));

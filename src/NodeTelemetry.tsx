@@ -6,23 +6,24 @@ import { pingState } from "./telemetry-display";
 const carriers = [{ isp: "telecom", label: "电信" }, { isp: "unicom", label: "联通" }, { isp: "mobile", label: "移动" }];
 const finite = (value?: number) => typeof value === "number" && Number.isFinite(value) && value >= 0;
 
-export function NodeTelemetry({ server, tri, formatBytes }: {
+export function NodeTelemetry({ server, tri, formatBytes, compact = false }: {
   server: ProbeServer;
   tri: ProbePayload["tri_isp"];
   formatBytes: (value?: number) => string;
+  compact?: boolean;
 }) {
   const matched = triISPRows(tri, server.ping || []);
   const rows = matched.length ? matched : carriers.map(carrier => ({ ...carrier, series: undefined }));
   const used = billableTraffic(server);
   const limit = server.traffic_limit;
   const usage = finite(used) && finite(limit) && limit! > 0 ? used! / limit! * 100 : undefined;
-  return <div className="node-telemetry">
-    <section className="traffic-summary">
+  return <div className={`node-telemetry${compact ? " compact" : ""}`}>
+    {!compact && <section className="traffic-summary">
       <div className="telemetry-heading"><h3>流量用量 / 总额度</h3><strong>{usage === undefined ? "—" : `${usage.toFixed(1)}%`}</strong></div>
       <p className="traffic-value">{formatBytes(used)} <span>/ {finite(limit) && limit! > 0 ? formatBytes(limit) : "额度未设置"}</span></p>
       <div className="track" aria-hidden="true"><i style={{ width: `${Math.min(100, usage ?? 0)}%` }} /></div>
       <p className="telemetry-note">{trafficUsageLabel(server)} · {trafficRuleLabel(server)}{usage !== undefined && usage > 100 ? " · 已超额" : ""}</p>
-    </section>
+    </section>}
     <section className="ping-summary">
       <div className="telemetry-heading"><h3>三网延迟</h3><span>{server.online ? "当前 ms" : "离线 · 历史采样"}</span></div>
       {rows.map((row, rowIndex) => {

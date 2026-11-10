@@ -1,0 +1,91 @@
+/*! Layout adapted from Tokinx/cf-server-monitor-theme-emerald (MIT); see /THIRD_PARTY_NOTICES.txt. */
+:root {
+  --bg: #f6f8fa; --text: #171a1d; --card: #ffffff; --muted: #626a77;
+  --soft: #eef1f4; --border: #e0e6e8; --green: #008b67; --red: #c73458;
+  --amber: #a96600; --blue: #2467d8; --purple: #8157bd; --orange: #b86a00;
+  --lime: #628400; --selected: #e6f6ef; --globe-shade: #e5e9eb; --globe-ink: #5c6872;
+  --surface: #ffffffdb;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+:root.dark {
+  --bg: #101719; --text: #e9f1ee; --card: #192325; --muted: #a7b4b7;
+  --soft: #243235; --border: #304145; --green: #3ed8a5; --red: #ff809f;
+  --amber: #f8ba58; --blue: #7aaaff; --purple: #ba98f3; --orange: #edaa55;
+  --lime: #bddf53; --selected: #1c4237; --globe-shade: #10282b; --globe-ink: #83b4a8;
+  --surface: #192325e8;
+}
+body { background: var(--bg); }
+body::before { content: ""; position: absolute; z-index: 0; pointer-events: none; inset: 0 0 auto; height: 520px; background: radial-gradient(ellipse at 56% 0%, color-mix(in srgb, var(--green) 28%, transparent), transparent 65%), linear-gradient(165deg, transparent 25%, color-mix(in srgb, var(--lime) 9%, transparent) 25% 45%, transparent 45%); }
+.shell { max-width: 1680px; padding: 0 20px; position: relative; z-index: 1; }
+.topbar { min-height: 70px; border: 0; }
+.brand { font-size: 21px; letter-spacing: -.5px; }.brand small { display: none; }
+.brand-icon { background: transparent; border: 0; color: var(--green); }
+button, select, .search { border-color: transparent; background: var(--surface); border-radius: 7px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline-color: var(--green); }
+.status-dot { width: 8px; height: 8px; box-shadow: none; }.status-dot.down { box-shadow: none; }
+.demo-note { padding: 0; margin: 0 0 8px; text-align: right; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fleet-summary { display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 24px; margin: 14px 0 24px; min-height: 260px; }
+.fleet-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fleet-stat { background: var(--surface); border-radius: 9px; padding: 16px; min-width: 0; }
+.fleet-stat>span { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; gap: 6px; }.fleet-stat svg { opacity: .45; }
+.fleet-stat p { margin-top: 28px; font-variant-numeric: tabular-nums; }.fleet-stat strong { font-size: clamp(18px, 1.65vw, 28px); font-weight: 650; white-space: nowrap; }.fleet-stat small { color: var(--muted); font-size: 11px; }
+.summary-note { color: var(--muted); font-size: 10px; line-height: 1.6; grid-column: 1 / -1; }
+.fleet-globe { position: relative; text-align: center; min-width: 0; }
+.fleet-globe svg { width: 100%; height: 265px; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--green) 8%, transparent)); }
+.fleet-status { display: flex; justify-content: center; gap: 12px; font-size: 11px; }
+.region-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: -18px; position: relative; }
+.region-chips span { background: var(--surface); padding: 3px 7px; border-radius: 4px; font-size: 10px; color: var(--muted); }
+.fleet-globe .summary-note { margin-top: 6px; }
+.home-heading { margin: 0 0 -34px; justify-content: flex-end; position: relative; z-index: 1; }
+.view-switch { padding: 0; border: 0; background: transparent; gap: 6px; }
+.view-switch button { padding: 8px; background: var(--surface); border-radius: 6px; }
+.view-switch button[aria-pressed=true] { color: var(--green); background: var(--card); box-shadow: none; }
+.toolbar { margin: 0 84px 18px 0; min-height: 34px; gap: 12px; }
+.tabs { background: var(--surface); border-radius: 7px; padding: 2px; gap: 2px; }
+.tabs button { padding: 6px 8px; font-size: 11px; }.tabs button[aria-pressed=true] { color: var(--green); background: var(--card); border-color: transparent; }
+.search-controls { gap: 6px; }.search input { width: 150px; }.search, select { padding: 7px 9px; font-size: 11px; }
+.servers.grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.server-card { background: var(--surface); border: 1px solid transparent; border-radius: 9px; padding: 15px; }
+a.server-card:hover { background: var(--card); border-color: color-mix(in srgb, var(--green) 30%, transparent); box-shadow: 0 4px 18px #10281b09; }
+.server-identity { gap: 8px; }.server-identity h2 { font-size: 15px; }.server-identity p { font-size: 10px; margin-top: 3px; }.chevron { border: 0; width: 18px; height: 18px; padding: 0; }
+.spec { margin: 12px 0; font-size: 10px; gap: 6px; }.resource-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.resource-grid .usage:last-child { grid-column: auto; }
+.usage { display: flex; flex-direction: column; }
+.usage>div:first-child { font-size: 11px; order: 0; }.usage strong { font-size: 12px; font-weight: 500; color: var(--text); }
+.usage .track { order: 1; }.resource-quantity { order: 2; margin-top: 5px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.track { height: 4px; border-radius: 3px; mask-image: none; margin-top: 6px; }.track i { background: var(--green); }.track i.warning { background: var(--orange); }.track i.danger { background: var(--red); }
+.network-grid { display: flex; justify-content: space-between; gap: 8px; border: 0; margin: 15px 0 10px; padding: 0; }
+.network-grid>div { flex-direction: row; align-items: baseline; gap: 4px; min-width: 0; }.network-grid strong { font-size: 11px; font-weight: 500; }.network-grid span { font-size: 10px; }
+.network-grid>div:first-child strong, .network-grid>div:first-child span { color: var(--green); }.network-grid>div:last-child strong, .network-grid>div:last-child span { color: var(--blue); }
+.node-telemetry { gap: 14px; margin: 14px 0; }.node-telemetry section { padding-top: 12px; }
+.telemetry-heading { margin-bottom: 9px; }.telemetry-heading h3 { font-size: 11px; font-weight: 550; }.telemetry-heading>span { font-size: 10px; }
+.ping-row { margin: 9px 0; }.ping-label { font-size: 10px; gap: 3px; }.ping-label strong { font-size: 11px; color: var(--green); font-weight: 500; }.ping-label small { font-size: 9px; }
+.ping-blocks { height: 12px; gap: 1px; margin-top: 4px; }.ping-block { border-radius: 1px; min-height: 3px; }
+.compact .telemetry-note { font-size: 9px; }.compact .route-row { display: inline-flex; margin: 3px 6px 0 0; font-size: 10px; gap: 4px; }
+.compact .route-tag { padding: 2px 5px; font-size: 9px; color: var(--muted); background: var(--soft); }
+.card-bottom { font-size: 10px; border-top: 1px dotted var(--border); padding-top: 10px; }
+.list .server-card { grid-template-columns: 1fr .7fr 1.5fr 1fr; padding: 16px; gap: 16px; }
+.list .node-telemetry { grid-template-columns: 1fr 1fr; gap: 24px; }.list .network-grid { flex-direction: column; }
+.back-link { margin-top: 16px; }.detail-header { margin: 20px 0; }.detail-header .eyebrow { display: none; }.detail-header h1 { font-size: 24px; }
+.detail-metrics>div, .chart-panel { border: 0; border-radius: 9px; background: var(--surface); }
+.detail-metrics>div { padding: 18px; }.detail-metrics .track { height: 4px; margin: 12px 0 8px; }.detail-metrics p { margin-top: 5px; }
+.detail-information { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+.detail-information article { min-width: 0; background: var(--surface); border-radius: 9px; padding: 16px; }.detail-information h2 { font-size: 16px; font-weight: 500; margin-bottom: 12px; }
+.detail-information dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.detail-information dl>div { min-width: 0; background: color-mix(in srgb, var(--soft) 75%, transparent); border-radius: 6px; padding: 11px; }
+.detail-information .wide { grid-column: 1 / -1; }.detail-information dt { font-size: 11px; color: var(--muted); margin-bottom: 6px; }.detail-information dd { font-size: 13px; margin: 0; overflow-wrap: anywhere; }
+main>.node-telemetry { border: 0; border-radius: 9px; background: var(--surface); }
+.section-heading { margin-top: 24px; }.section-heading h2 { font-size: 17px; }.home-heading { margin-top: 0; }
+.charts { gap: 16px; }.chart-panel { padding: 18px; }.chart { height: 220px; }
+footer { border: 0; margin-top: 32px; padding-top: 16px; }
+@media (max-width: 1199px) { .servers.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }.fleet-summary { grid-template-columns: 1.3fr 1fr; }.fleet-stat { padding: 12px; }.fleet-stat strong { font-size: 20px; } }
+@media (max-width: 900px) { .servers.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.fleet-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.fleet-stat p { margin-top: 16px; }.list .server-card { grid-template-columns: 1fr 1fr; }.list .node-telemetry { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .shell { padding: 0 14px; }.topbar { min-height: 62px; }.brand { font-size: 19px; }.brand-icon { width: 26px; }.brand small { display: none; }
+  .fleet-summary { display: flex; flex-direction: column-reverse; gap: 14px; margin: 8px 0 20px; }.fleet-globe { width: 100%; }.fleet-globe svg { height: 200px; }.fleet-stats { width: 100%; gap: 8px; }.fleet-stat { padding: 12px; }.fleet-stat p { margin-top: 16px; }.fleet-stat strong { font-size: 22px; }
+  .home-heading { margin: 0 0 -34px; }.toolbar { margin-right: 0; gap: 12px; }.tabs { margin-right: 84px; }.search-controls { width: 100%; }.search { flex: 1; }.search input { width: 100%; }
+  .servers.grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }.server-card { padding: 17px; }.resource-grid { gap: 12px 18px; }.usage strong { font-size: 12px; }
+  .detail-information { grid-template-columns: minmax(0, 1fr); gap: 12px; }.detail-metrics { grid-template-columns: minmax(0, 1fr); gap: 10px; }.detail-metrics>div { padding: 16px; }.detail-header h1 { font-size: 21px; }.detail-header { gap: 10px; }
+  .list .node-telemetry { gap: 12px; }.chart { height: 205px; }.chart-panel { padding: 16px; }.legend { gap: 8px; }
+}

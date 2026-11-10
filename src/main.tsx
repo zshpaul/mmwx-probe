@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { applyAppearance } from './use-probe'
 import './styles.css'
+import './emerald.css'
 
 applyAppearance()
 createRoot(document.getElementById('root')!).render(
