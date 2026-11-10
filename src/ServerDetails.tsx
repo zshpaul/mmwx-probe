@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "re
 import { ArrowLeft, Banknote, CalendarDays, Coins, Cpu, HardDrive, MemoryStick, Monitor, Network, Receipt, Server, Timer, Workflow, type LucideIcon } from "lucide-react";
 import type { ProbeServer } from "./types";
 import { OsIcon, RegionFlag } from "./ServerSymbols";
+import { PingHistory } from "./EmeraldPing";
 import { billableTraffic, trafficUsageLabel } from "./traffic-display";
 import { bytes, detailRanges, historyRows, isNumber, percent, priceCards, ratio, requestRange, speed, uptime, type DetailRange, type SystemResponse } from "./emerald-model";
 const Trend = lazy(() => import("./Trend"));
@@ -54,7 +55,6 @@ export function ServerDetails({ server, index, updatedAt }: { server: ProbeServe
     { label: "CPU", value: server.cpu_model ? `${server.cpu_model}${server.cpu_cores ? ` (x${server.cpu_cores})` : ""}` : isNumber(server.cpu_cores) ? `${server.cpu_cores} 核` : undefined, icon: Cpu, wide: true },
     { label: "架构", value: server.arch, icon: Workflow },
     { label: "内核", value: server.kernel, icon: Server },
-    { label: "线程", value: server.cpu_threads, icon: Cpu },
   ];
   const system: InfoItem[] = [
     { label: "操作系统", value: server.os ? <span className="os-value"><OsIcon os={server.os} />{server.os}</span> : undefined, icon: Monitor },
@@ -87,6 +87,7 @@ export function ServerDetails({ server, index, updatedAt }: { server: ProbeServe
       {present(server.upload_speed, "upload_speed") || present(server.download_speed, "download_speed") ? <Trend title="网络" summary={`↑ ${speed(server.upload_speed)}　↓ ${speed(server.download_speed)}`} unit="MB/s" rows={rows} lines={[{ key: "download_speed", name: "下载", color: "#60A5FA" }, { key: "upload_speed", name: "上传", color: "#A78BFA" }]} loading={loading} error={error} /> : null}
       {present(server.tcp_connections, "tcp_connections") || present(server.udp_connections, "udp_connections") ? <Trend title="连接" summary={`TCP: ${server.tcp_connections ?? "—"} · UDP: ${server.udp_connections ?? "—"}`} unit="" rows={rows} lines={[{ key: "tcp_connections", name: "TCP", color: "#FF6B6B" }, { key: "udp_connections", name: "UDP", color: "#4ECDC4" }]} loading={loading} error={error} /> : null}
     </div></Suspense>
+    {!!server.ping?.length && <PingHistory server={server} index={index} />}
     {!loading && !error && !["cpu_pct", "mem_used", "disk_used", "upload_speed", "download_speed", "tcp_connections", "udp_connections"].some(key => present(server[key as keyof ProbeServer], key)) && <div className="empty">此节点尚未上报系统指标</div>}
   </main>;
 }

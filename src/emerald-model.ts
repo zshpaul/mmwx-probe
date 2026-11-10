@@ -25,6 +25,29 @@ export function uptime(value?: number) {
 export const cycleNames = { month: "月", quarter: "季度", half_year: "半年", year: "年", two_year: "两年", three_year: "三年", permanent: "永久" };
 const cycleDays = { month: 30, quarter: 90, half_year: 180, year: 365, two_year: 730, three_year: 1095, permanent: 0 };
 const symbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$", EUR: "€", GBP: "£", JPY: "¥" };
+export function financeSummary(servers: ProbeServer[], now: number) {
+  const totals = new Map<string, { currency: string; total: number; monthly: number; remaining: number; priced: number; periodic: number; estimated: number }>();
+  for (const server of servers) {
+    const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency;
+    const price = isNumber(server.renewal_price_cny) ? server.renewal_price_cny : server.renewal_price;
+    if (!currency || !isNumber(price) || price < 0) continue;
+    const group = totals.get(currency) || { currency, total: 0, monthly: 0, remaining: 0, priced: 0, periodic: 0, estimated: 0 };
+    group.total += price;
+    group.priced++;
+    const days = server.renewal_cycle ? cycleDays[server.renewal_cycle] : undefined;
+    const expiry = Date.parse(server.expires_at || "");
+    if (days) {
+      group.periodic++;
+      group.monthly += price / days * 30;
+      if (Number.isFinite(expiry)) {
+        group.remaining += price * Math.max(0, (expiry - now) / 86400000) / days;
+        group.estimated++;
+      }
+    }
+    totals.set(currency, group);
+  }
+  return [...totals.values()];
+}
 export type PriceCard = { label: string; value: string; unit?: string; title?: string; tone?: string };
 export function priceCards(server: ProbeServer, now: number): PriceCard[] {
   const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency;

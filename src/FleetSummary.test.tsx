@@ -9,8 +9,10 @@ const markup = renderToStaticMarkup(<FleetSummary formatBytes={value => value ==
 function check(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
-check(markup.includes("<strong>2</strong> <small>/ 8</small>"), "Resource sums must exclude stale and incomplete measurements");
+check(markup.includes("<strong>2</strong><small> / 8</small>"), "Resource sums must exclude stale and incomplete measurements");
 check(markup.includes("<strong>32</strong>"), "Traffic sum must include billable fallback and offline usage");
-check(markup.includes("<strong>5/s</strong>"), "Speed totals must exclude offline nodes");
-check(markup.includes("<strong>10</strong> <small>/ 100</small>"), "Disk totals must exclude offline resources");
+check(markup.includes("<strong>5</strong><small>B/s "), "Speed totals must exclude offline nodes");
+check(markup.includes("<strong>10</strong><small> / 100</small>"), "Disk totals must exclude offline resources");
 check(markup.includes("不标注精确机房坐标"), "Geographic illustration must not imply measured coordinates");
+check((markup.match(/class="fleet-stat"/g) || []).length === 6, "All six overview cards must render");
+check(markup.includes("计费流量") && markup.includes("剩余价值"), "Fallback scope and finance must stay visible");

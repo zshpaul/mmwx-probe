@@ -40,7 +40,15 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 - `InstanceDetail.vue` / `LoadChart.vue`：价格四卡、2 列信息区、3 列图表、192px 绘图区；采用原图表珊瑚红、青绿、天蓝和紫色。
 - `utils/helper.ts`：字节与速率按 1024 换算，沿用 B / KB / MB / GB / TB / PB 标签，B 和 KB 为整数，MB 及以上保留一位小数。
 
-默认不渲染服务器总览（统计卡片及地球），也不渲染三网延迟、回程、丢包等区块；底层组件和数据契约保留。只提供 Emerald 一套外观；右上角切换浅色 → 深色 → 自动。管理入口保留本项目的 passkey 登录，不使用对方的管理地址。
+唯一视觉标准为 `https://ran.haru2s.com/#/`。首页默认显示总览六格、可拖动的地区地球、节点三网摘要及延迟/丢包两条采样条；列表保留三网入口，卡片采样条打开延迟历史弹窗，详情显示延迟历史与系统图表。只提供 Emerald 一套外观；右上角切换浅色 → 深色 → 自动。管理入口保留本项目的 passkey 登录，不使用对方的管理地址。
+
+- 三网值复用 `tri_isp` 配置与 `ping[].isp` 映射，不拿任意三个目标冒充运营商；缺失运营商显示 `—`。
+- 两条采样条遵循 Emerald `useNodePingDisplay` 的等高色块语义：上报目标同槽位均值，再按顺序分成最多十段，颜色表示段内平均延迟/丢包；摘要为有效采样均值。延迟阈值为 60/120/180/240 ms，丢包阈值为 1/3/6/9%。100% 丢包不当作有效延迟，缺测保留灰色；`buckets` 没有时刻，tooltip 只标采样序号，不编造“一小时”或时间戳。
+- 延迟历史使用 `/api/series` 的 `all_series`、`generated_at`、`bucket_sec`、`buckets`；提供范围切换、目标全选/全不选、延迟/丢包开关和 tooltip。平滑采用 EWMA α=0.3，保留缺测断点，不补造原始样本；关闭即可查看原始值。
+- 总览资源/速率只汇总在线有效上报值，累计流量使用 `cumulative_up/down`；没有累计计数时明确显示“计费流量”，按各节点自身计费周期合计。剩余价值从价格/周期/到期时间推导，缺项排除；价值弹窗按币种分别汇总，不请求或假造汇率。
+- 地球使用国家级地理示意位置并显示实际地区聚合速率；可自动旋转、拖动和键盘旋转，尊重减少动画偏好。没有精确机房坐标或节点间链路字段，因此不画虚构连线。未使用原站访客 IP/定位底栏。
+- 原站后台配置（分组、自定义标签、背景、地球模式、价格可见性等）不在本项目公开 API 的配置契约内，不创建无功能设置按钮；现有 passkey 不变。GPU/Swap/进程等缺失字段不填假数据；回程路线没有对应原站区域，不额外混入卡片。
+- 按当前用户要求，卡片底部“溢价 / 无溢价 / free”等灰框自定义标签及列表同类标签不展示。
 
 详情按 `src/types.ts` 和系统序列接入实际字段，缺失的格子直接隐藏：
 
@@ -49,7 +57,7 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 | 节点价格 | `renewal_price_cny` 优先；否则 `renewal_price` + `renewal_currency`，不请求外部汇率 |
 | 月均支出、剩余价值 | 根据已上报价格、`renewal_cycle`、`expires_at` 推导；月/季/半年/年/两年/三年按 30/90/180/365/730/1095 天折算，月均按 30 天；提示标明估算，非账单或退款额 |
 | 剩余时间 | `expires_at`；仅明确 `renewal_cycle=permanent` 才显示长期 |
-| 硬件 | `cpu_model`、`cpu_cores`、`cpu_threads`、`arch`、`kernel` |
+| 硬件 | `cpu_model`、`cpu_cores`、`arch`、`kernel`；不额外添加原站没有的独立线程格 |
 | 系统 | `os`、`uptime`；离线时才有 `last_seen`，不能用浏览器收包时间冒充在线节点最后上报时间 |
 | 存储 / 网络 | `mem_total`、`disk_total`、`traffic_used`（回退 `traffic_used_total`）、`traffic_limit`、`upload_speed`、`download_speed`；未设置限额不冒充无限流量 |
 | 系统历史 | `/api/series?metric=system` 的 `{t,value}` 序列：`cpu_pct`、`mem_used`、`disk_used`、`upload_speed`、`download_speed`、`tcp_connections`、`udp_connections` |
@@ -200,7 +208,7 @@ git push -u origin main
 
 ## 许可证
 
-页面设计及石色主题适配自 Nezha 默认前端 `nezhahq/user-frontend-backup`（源自 `hamster1963/nezha-dash-v2`），固定提交 `1dd038bea8f6c5143c3e8fb4077fead24994fe4e`，Apache-2.0。署名与改动说明见 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)，完整许可随静态产物一起分发。未使用其商标 logo。
+当前页面设计适配自 Emerald（MIT），固定版本见“Emerald 展示约定”。保留的基础样式曾适配自 Nezha 默认前端 `nezhahq/user-frontend-backup`（源自 `hamster1963/nezha-dash-v2`），固定提交 `1dd038bea8f6c5143c3e8fb4077fead24994fe4e`，Apache-2.0。全部署名与改动说明见 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)，完整许可随静态产物一起分发。未使用其商标 logo。
 
 2026-11-09 通过 GitHub API 核验的轻量服务器探针候选（并非全部可观测性产品）：Nezha 10,393 stars（WTFPL，默认前端 Apache-2.0），Komari 6,956（MIT），cppla/ServerStatus 4,683（MIT），zdz/ServerStatus-Rust 2,334（Apache-2.0），hamster1963/nezha-dash 1,692（Apache-2.0），BotoX/ServerStatus 824（WTFPL）。按探针项目主仓库 star 排序选择 Nezha；其前端独立仓库的 star 不等于主项目 star。WTFPL 并不禁止修改和再分发，因此没有跳过第一名。
 
