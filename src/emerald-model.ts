@@ -15,6 +15,16 @@ export function bytes(value?: number, base = 1024) {
 }
 export const speed = (value?: number) => isNumber(value) ? `${bytes(value)}/s` : "—";
 export const locationName = (server: ProbeServer) => [server.region_name || server.region || server.region_country, server.region_city].filter(Boolean).join(" · ");
+const cityNames: Record<string, string> = {
+  "los angeles": "洛杉矶", "san jose": "圣何塞", osaka: "大阪", tokyo: "东京",
+  "hong kong": "香港", singapore: "新加坡", guangzhou: "广州", shanghai: "上海",
+  beijing: "北京", seoul: "首尔", london: "伦敦", frankfurt: "法兰克福",
+  amsterdam: "阿姆斯特丹", sydney: "悉尼", "new york": "纽约", seattle: "西雅图",
+};
+export function nodeLocation(server: ProbeServer): string {
+  const location = [server.region_city, server.region_name, server.region].find(value => value?.trim() && !/^(unknown|未知|[-—]+)$/i.test(value.trim()))?.trim() || "";
+  return cityNames[location.toLowerCase()] || location;
+}
 export function uptime(value?: number) {
   if (!isNumber(value) || value < 0) return undefined;
   const days = Math.floor(value / 86400);
@@ -28,15 +38,18 @@ const symbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$", EUR: 
 export function financeSummary(servers: ProbeServer[], now: number) {
   const totals = new Map<string, { currency: string; total: number; monthly: number; remaining: number; priced: number; periodic: number; estimated: number }>();
   for (const server of servers) {
-    const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency;
     const price = isNumber(server.renewal_price_cny) ? server.renewal_price_cny : server.renewal_price;
+    const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency || (price === 0 ? "未指定币种" : undefined);
     if (!currency || !isNumber(price) || price < 0) continue;
     const group = totals.get(currency) || { currency, total: 0, monthly: 0, remaining: 0, priced: 0, periodic: 0, estimated: 0 };
     group.total += price;
     group.priced++;
     const days = server.renewal_cycle ? cycleDays[server.renewal_cycle] : undefined;
     const expiry = Date.parse(server.expires_at || "");
-    if (days) {
+    if (price === 0) {
+      group.periodic++;
+      group.estimated++;
+    } else if (days) {
       group.periodic++;
       group.monthly += price / days * 30;
       if (Number.isFinite(expiry)) {
@@ -53,16 +66,18 @@ export function priceCards(server: ProbeServer, now: number): PriceCard[] {
   const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency;
   const price = isNumber(server.renewal_price_cny) ? server.renewal_price_cny : server.renewal_price;
   const hasPrice = isNumber(price) && price >= 0 && !!currency;
+  const free = price === 0;
   const money = (amount: number) => `${symbols[currency!] || ""}${amount.toFixed(2)}`;
   const days = server.renewal_cycle ? cycleDays[server.renewal_cycle] : undefined;
   const expiration = server.expires_at ? Date.parse(server.expires_at) : NaN;
   const remaining = Number.isFinite(expiration) ? (expiration - now) / 86400000 : undefined;
   const cards: PriceCard[] = [];
-  if (hasPrice) cards.push({ label: "节点价格", value: money(price), unit: `${currency}${server.renewal_cycle ? ` / ${cycleNames[server.renewal_cycle]}` : ""}` });
-  if (hasPrice && days) cards.push({ label: "月均支出", value: money(price / days * 30), unit: `${currency} / 月`, title: `按 ${days} 天计费周期折算 30 天月均支出，非实际账单` });
+  if (free) cards.push({ label: "节点价格", value: "免费" });
+  else if (hasPrice) cards.push({ label: "节点价格", value: money(price), unit: `${currency}${server.renewal_cycle ? ` / ${cycleNames[server.renewal_cycle]}` : ""}` });
+  if (hasPrice && !free && days) cards.push({ label: "月均支出", value: money(price / days * 30), unit: `${currency} / 月`, title: `按 ${days} 天计费周期折算 30 天月均支出，非实际账单` });
   if (remaining !== undefined) cards.push({ label: "剩余时间", value: remaining <= 0 ? "已到期" : `${Math.ceil(remaining)}`, unit: remaining > 0 ? "天" : undefined, tone: remaining > 7 ? "positive" : "warning", title: `到期时间：${new Date(expiration).toLocaleString("zh-CN", { hour12: false })}` });
-  else if (server.renewal_cycle === "permanent") cards.push({ label: "剩余时间", value: "长期" });
-  if (hasPrice && days && remaining !== undefined) cards.push({ label: "剩余价值", value: money(price * Math.max(0, remaining) / days), unit: currency, title: `按剩余天数 / ${days} 天周期估算，非可退款金额` });
+  else if (server.renewal_cycle === "permanent" && !free) cards.push({ label: "剩余时间", value: "长期" });
+  if (hasPrice && !free && days && remaining !== undefined) cards.push({ label: "剩余价值", value: money(price * Math.max(0, remaining) / days), unit: currency, title: `按剩余天数 / ${days} 天周期估算，非可退款金额` });
   return cards;
 }
 

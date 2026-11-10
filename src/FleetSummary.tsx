@@ -55,7 +55,7 @@ function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visito
     return [...grouped].map(([code, nodes]) => ({ code, nodes, coordinate: coordinates.get(code)! }));
   }, [servers]);
   const visitorCoordinate = coordinates.get(visitorCountryCode || "");
-  const arcs = visitorCoordinate ? clusters.map(cluster => ({
+  const arcs = visitorCoordinate ? clusters.filter(cluster => cluster.code !== visitorCountryCode).map(cluster => ({
     code: cluster.code,
     path: arcPath(sampleArc(projection, cluster.coordinate, visitorCoordinate, 64, .4)),
   })) : [];

@@ -4,9 +4,15 @@ import type { ProbePayload, ProbeServer } from "./types";
 import { triISPRows } from "./tri-isp";
 import { detailRanges, type DetailRange } from "./emerald-model";
 import { average, fetchPingHistory, pingHistoryRows, pingSummary, pingTone, smoothPingRows, validLatency, validLoss, type PingResponse } from "./emerald-ping";
+import { latestReturnRoute } from "./telemetry-display";
 
 const Trend = lazy(() => import("./Trend"));
 const colors = ["#FF6B6B", "#4ECDC4", "#A78BFA", "#60A5FA", "#FFB347"];
+export function PingRouteLabel({ server, isp }: { server: ProbeServer; isp?: string }) {
+  const route = latestReturnRoute(server.return_routes, isp);
+  const label = route?.route_type?.trim();
+  return label && !/^(unknown|未知|[-—]+)$/i.test(label) ? <span className="node-city route-label" title={`回程线路：${label}${route?.tested_at ? `；检测时间：${route.tested_at}` : ""}`}>{label}</span> : null;
+}
 export function EmeraldPingSummary({ server, tri, onOpen, compact = false }: {
   server: ProbeServer; tri?: ProbePayload["tri_isp"]; onOpen: () => void; compact?: boolean;
 }) {
@@ -29,7 +35,7 @@ export function EmeraldPingSummary({ server, tri, onOpen, compact = false }: {
     })}</div>}
   </div>;
 }
-export function PingHistory({ server, index }: { server: ProbeServer; index: number }) {
+export function PingHistory({ server, index, showRoutes = false }: { server: ProbeServer; index: number; showRoutes?: boolean }) {
   const [range, setRange] = useState<DetailRange>("1h");
   const [response, setResponse] = useState<PingResponse>();
   const [error, setError] = useState<string>();
@@ -71,7 +77,7 @@ export function PingHistory({ server, index }: { server: ProbeServer; index: num
       const key = item.key || item.label;
       const latency = average(rows.map(row => row[`latency${position}`]));
       const packetLoss = average(rows.map(row => row[`loss${position}`]));
-      return <button key={key} aria-pressed={!hidden.includes(key)} onClick={() => setHidden(hidden.includes(key) ? hidden.filter(value => value !== key) : [...hidden, key])} title={`最新：${server.online && validLatency(item.current_ms) && validLoss(item.loss_pct) && item.loss_pct < 100 ? `${Math.round(item.current_ms)} ms` : "无响应或未上报"}；均值按当前范围有效采样计算`}><strong><i style={{ background: colors[position % colors.length] }} />{item.label}</strong><span>{latency === undefined ? "—" : `${Math.round(latency)}ms`} · {packetLoss === undefined ? "—" : `${packetLoss.toFixed(2)}%`}</span></button>;
+      return <button key={key} aria-pressed={!hidden.includes(key)} onClick={() => setHidden(hidden.includes(key) ? hidden.filter(value => value !== key) : [...hidden, key])} title={`最新：${server.online && validLatency(item.current_ms) && validLoss(item.loss_pct) && item.loss_pct < 100 ? `${Math.round(item.current_ms)} ms` : "无响应或未上报"}；均值按当前范围有效采样计算`}><strong><i style={{ background: colors[position % colors.length] }} /><span className="ping-target-name">{item.label}</span>{showRoutes && <PingRouteLabel server={server} isp={item.isp} />}</strong><span>{latency === undefined ? "—" : `${Math.round(latency)}ms`} · {packetLoss === undefined ? "—" : `${packetLoss.toFixed(2)}%`}</span></button>;
     })}</div>
     <div className="ping-actions"><button aria-pressed={delay} onClick={() => setDelay(!delay)}>延迟</button><button aria-pressed={loss} onClick={() => setLoss(!loss)}>丢包</button><button aria-pressed={smooth} onClick={() => setSmooth(!smooth)} title="EWMA α=0.3；保留缺测断点，关闭可查看原始采样">平滑峰值</button></div>
     <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}>

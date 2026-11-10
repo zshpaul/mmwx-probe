@@ -23,3 +23,7 @@ const invalidVisitor = renderToStaticMarkup(<FleetSummary servers={globeServers}
 check((withVisitor.match(/节点国家至访客国家的示意连线/g) || []).length === 2, "Each node country connects to visitor country");
 check(!withoutVisitor.includes("节点国家至访客国家的示意连线") && !invalidVisitor.includes("节点国家至访客国家的示意连线"), "No visitor means no arcs");
 check(withVisitor.includes('stroke-width="0.8"'), "Emerald arc width");
+const sameCountry = renderToStaticMarkup(<FleetSummary servers={[...globeServers, { online: true, region_country: "US" }]} formatBytes={String} visitorCountryCode="US" />);
+check((sameCountry.match(/节点国家至访客国家的示意连线/g) || []).length === 2, "Same-country nodes must not create a degenerate arc");
+const onlySameCountry = renderToStaticMarkup(<FleetSummary servers={[{ online: true, region_country: "US" }]} formatBytes={String} visitorCountryCode="US" />);
+check(!onlySameCountry.includes("节点国家至访客国家的示意连线"), "Only same-country nodes means no arcs");

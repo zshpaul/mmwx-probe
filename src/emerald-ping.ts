@@ -40,8 +40,9 @@ export async function fetchPingHistory(index: number, range: DetailRange, signal
   return { ...body, all_series: series };
 }
 export function pingHistoryRows(response: PingResponse | undefined, hours: number) {
-  if (!response || !validLatency(response.generated_at) || !validLatency(response.bucket_sec) || response.bucket_sec === 0 || !Number.isInteger(response.buckets) || response.buckets! <= 0 || response.buckets! > 10000) return [];
-  const count = response.buckets!;
+  if (!response || !validLatency(response.generated_at) || !validLatency(response.bucket_sec) || response.bucket_sec === 0) return [];
+  const count = Math.max(0, ...(response.all_series || []).map(series => series.buckets.length));
+  if (count === 0 || count > 10000) return [];
   const end = Math.floor(response.generated_at / response.bucket_sec) * response.bucket_sec;
   return Array.from({ length: count }, (_, index) => {
     const row: Record<string, number | null> = { time: end - (count - 1 - index) * response.bucket_sec! };

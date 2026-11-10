@@ -77,6 +77,14 @@ a.server-card:hover { background: var(--background); transform: translateY(-2px)
 .status-dot { width: 8px; height: 8px; background: #059669; box-shadow: none; }
 .status-dot.down { background: #dc2626; box-shadow: none; }
 .server-identity h2 { font-size: 14px; line-height: 24px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.server-identity h2 { display: flex; align-items: baseline; gap: 6px; }
+.server-identity h2 .card-link, .column-name strong, .detail-heading .node-name { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-city { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; font-weight: 400; }
+.server-card .resource-quantity, .server-card .node-city { position: relative; z-index: 1; }
+.server-icons, .column-name>.region-flag { flex-shrink: 0; }
+.column-name strong { max-width: calc(100% - 28px); }
+.detail-heading h1 { min-width: 0; overflow: hidden; }
+.detail-heading .node-name { max-width: calc(100% - 24px); }
 .server-icons { display: flex; gap: 8px; align-items: center; color: var(--muted); }
 .server-icons>span { display: flex; align-items: center; }
 .region-flag { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; border-radius: 4px; filter: drop-shadow(0 0 2px #0000001a); }
@@ -191,7 +199,7 @@ footer .connection { font-size: 11px; margin: 0; }
 .visitor-info svg { color: var(--green); flex-shrink: 0; }
 footer { padding-bottom: 56px; }
 .fleet-status { position: absolute; top: 48px; left: 0; display: flex; gap: 8px; padding: 2px 8px; background: var(--surface); border-radius: 4px; font-size: 10px; pointer-events: none; }
-.globe-rate { background: var(--surface); border-radius: 2px; padding: 2px 3px; width: max-content; font-size: 10px; line-height: 12px; }
+.globe-rate { background: var(--surface); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 4px; padding: 2px 4px; width: max-content; font-size: 10px; font-weight: 500; line-height: 12px; text-shadow: 0 0 2px var(--background), 0 0 4px var(--background); }
 .globe-rate span { display: block; }
 .fleet-globe .region-flag { width: 16px; height: 16px; }
 .home>.toolbar, .home>.servers, .home>.server-table { position: relative; z-index: 2; }
@@ -226,6 +234,8 @@ footer { padding-bottom: 56px; }
 .ping-targets button[aria-pressed=false] { opacity: .3; }
 .ping-targets strong { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .ping-targets strong i { width: 4px; height: 16px; border-radius: 4px; }
+.ping-targets strong i, .ping-target-name { flex-shrink: 0; }
+.ping-target-name { max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ping-targets button>span { display: block; font-size: 12px; margin-top: 4px; color: var(--muted); }
 .ping-history>.chart-panel .chart { height: 288px; }
 .ping-chart-tooltip { padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); font-size: 12px; }

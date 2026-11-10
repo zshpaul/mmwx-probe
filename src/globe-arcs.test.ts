@@ -26,6 +26,8 @@ const dist = (x: number, y: number) => Math.hypot(x - 320, y - 190);
 
 ok(arcAltitude(HK, US) > arcAltitude(HK, JP), "越远应抬得越高");
 ok(arcAltitude([0, 0], [180, 0]) <= 0.34 + 1e-9, "最高不超过半径的 0.34");
+ok(sampleArc(projection(), US, US, 64, .4).length === 0, "Coincident coordinates must not produce a radial spike");
+ok(sampleArc(projection(), HK, HK, 64, .4).length === 0, "Front-facing coincident coordinates must also be omitted");
 
 {
   const p = projection();

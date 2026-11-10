@@ -33,6 +33,7 @@ export function sampleArc(
   segments = 64,
   altitude = arcAltitude(from, to),
 ): ArcPoint[] {
+  if (geoDistance(from, to) < 1e-8) return [];
   const [cx, cy] = projection.translate();
   const radius = projection.scale();
   const center = projection.invert?.([cx, cy]);

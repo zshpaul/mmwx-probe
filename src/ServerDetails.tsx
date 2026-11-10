@@ -5,7 +5,7 @@ import { OsIcon, RegionFlag } from "./ServerSymbols";
 import { PingHistory } from "./EmeraldPing";
 import { billableTraffic, trafficUsageLabel } from "./traffic-display";
 import { requestJson } from "./request-json";
-import { bytes, detailRanges, historyRows, isNumber, percent, priceCards, ratio, requestRange, speed, uptime, type DetailRange, type SystemResponse } from "./emerald-model";
+import { bytes, detailRanges, historyRows, isNumber, nodeLocation, percent, priceCards, ratio, requestRange, speed, uptime, type DetailRange, type SystemResponse } from "./emerald-model";
 const Trend = lazy(() => import("./Trend"));
 type InfoItem = { label: string; value?: ReactNode; icon: LucideIcon; wide?: boolean; title?: string; progress?: number; aside?: string };
 function InfoCard({ title, items, layout }: { title: string; items: InfoItem[]; layout: string }) {
@@ -69,12 +69,12 @@ export function ServerDetails({ server, index, updatedAt }: { server: ProbeServe
     { label: "网络速率", value: isNumber(server.upload_speed) || isNumber(server.download_speed) ? `↑ ${speed(server.upload_speed)}　↓ ${speed(server.download_speed)}` : undefined, icon: Network },
   ];
   return <main className="detail">
-    <div className="detail-heading"><a href="#" className="icon-button back-link" aria-label="返回节点列表" title="返回节点列表"><ArrowLeft size={16} /></a><h1><RegionFlag server={server} />{server.name || `节点 ${index + 1}`}</h1><span className={`status-badge ${server.online ? "positive" : "negative"}`}>{server.online ? "在线" : "离线"}</span></div>
+    <div className="detail-heading"><a href="#" className="icon-button back-link" aria-label="返回节点列表" title="返回节点列表"><ArrowLeft size={16} /></a><h1><RegionFlag server={server} /><span className="node-name">{server.name || `节点 ${index + 1}`}</span>{nodeLocation(server) && <span className="node-city" title={nodeLocation(server)}>{nodeLocation(server)}</span>}</h1><span className={`status-badge ${server.online ? "positive" : "negative"}`}>{server.online ? "在线" : "离线"}</span></div>
     {!server.online && <div className="notice">节点离线，以下为最后上报值。</div>}
     {prices.length > 0 && <section className="price-grid" aria-label="价格信息">{prices.map(card => {
       const Icon = priceIcons[["节点价格", "月均支出", "剩余时间", "剩余价值"].indexOf(card.label)];
       const largeCurrency = card.label === "节点价格" || card.label === "月均支出";
-      return <article className="price-card" key={card.label} title={card.title}><div><span>{card.label}</span><Icon size={20} /></div><p className={card.tone}><strong>{card.value}{largeCurrency && ` ${card.unit?.split(" / ")[0]}`}</strong>{card.unit && <small>{largeCurrency ? card.unit.includes(" / ") ? `/ ${card.unit.split(" / ")[1]}` : "" : card.unit}</small>}</p></article>;
+      return <article className="price-card" key={card.label} title={card.title}><div><span>{card.label}</span><Icon size={20} /></div><p className={card.tone}><strong>{card.value}{largeCurrency && card.unit && ` ${card.unit.split(" / ")[0]}`}</strong>{card.unit && <small>{largeCurrency ? card.unit.includes(" / ") ? `/ ${card.unit.split(" / ")[1]}` : "" : card.unit}</small>}</p></article>;
     })}</section>}
     <section className="detail-information"><InfoCard title="硬件信息" items={hardware} layout="hardware" /><InfoCard title="系统信息" items={system} layout="system" /><InfoCard title="存储信息" items={storage} layout="storage" /><InfoCard title="网络信息" items={network} layout="network" /></section>
     <div className="range-selector" role="group" aria-label="历史时间范围">{detailRanges.map(option => <button key={option} aria-pressed={range === option} onClick={() => setRange(option)}>{option.toUpperCase()}</button>)}</div>
@@ -86,7 +86,7 @@ export function ServerDetails({ server, index, updatedAt }: { server: ProbeServe
       {present(server.upload_speed, "upload_speed") || present(server.download_speed, "download_speed") ? <Trend title="网络" summary={`↑ ${speed(server.upload_speed)}　↓ ${speed(server.download_speed)}`} unit="MB/s" rows={rows} lines={[{ key: "download_speed", name: "下载", color: "#60A5FA" }, { key: "upload_speed", name: "上传", color: "#A78BFA" }]} loading={loading} error={error} /> : null}
       {present(server.tcp_connections, "tcp_connections") || present(server.udp_connections, "udp_connections") ? <Trend title="连接" summary={`TCP: ${server.tcp_connections ?? "—"} · UDP: ${server.udp_connections ?? "—"}`} unit="" rows={rows} lines={[{ key: "tcp_connections", name: "TCP", color: "#FF6B6B" }, { key: "udp_connections", name: "UDP", color: "#4ECDC4" }]} loading={loading} error={error} /> : null}
     </div></Suspense>
-    {!!server.ping?.length && <PingHistory server={server} index={index} />}
+    {!!server.ping?.length && <PingHistory server={server} index={index} showRoutes />}
     {!loading && !error && !["cpu_pct", "mem_used", "disk_used", "upload_speed", "download_speed", "tcp_connections", "udp_connections"].some(key => present(server[key as keyof ProbeServer], key)) && <div className="empty">此节点尚未上报系统指标</div>}
   </main>;
 }
