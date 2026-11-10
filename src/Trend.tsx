@@ -20,7 +20,7 @@ export default function Trend({ title, summary, unit, rows, lines, loading, erro
   const identifier = useId().replaceAll(":", "");
   const hasValues = rows.some(row => lines.some(line => row[line.key] !== null && row[line.key] !== undefined));
   const palette = lines.some(line => line.key === "cpu") ? resourcePalette : signalPalette;
-  const formatValue = (value: number) => unit === "GB" ? bytes(value * 1e9) : unit === "MB/s" ? speed(value * 1e6) : `${Number(value.toFixed(1))}${unit}`;
+  const formatValue = (value: number) => unit === "GB" ? bytes(value * 1024 ** 3) : unit === "MB/s" ? speed(value * 1024 ** 2) : `${Number(value.toFixed(1))}${unit}`;
   return <section className="chart-panel">
     <div className="chart-heading"><h3>{title}</h3><span>{summary || unit}</span></div>
     <div className="chart" aria-label={`${title}趋势图`}>

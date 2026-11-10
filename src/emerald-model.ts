@@ -6,12 +6,12 @@ import { resourceHistoryFromSeries, type ResourceSeriesInput } from "./resource-
 export const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 export const ratio = (used?: number, total?: number) => isNumber(used) && isNumber(total) && total > 0 ? Math.min(100, Math.max(0, used / total * 100)) : undefined;
 export const percent = (value?: number) => isNumber(value) ? `${value.toFixed(1)}%` : "—";
-export function bytes(value?: number, base = 1000) {
+export function bytes(value?: number, base = 1024) {
   if (!isNumber(value)) return "—";
-  const units = ["B", "KB", "MB", "GB", "TB"];
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
   let amount = Math.max(0, value), unit = 0;
   while (amount >= base && unit < units.length - 1) { amount /= base; unit++; }
-  return `${amount.toFixed(unit ? 1 : 0)} ${units[unit]}`;
+  return `${amount.toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
 }
 export const speed = (value?: number) => isNumber(value) ? `${bytes(value)}/s` : "—";
 export const locationName = (server: ProbeServer) => [server.region_name || server.region || server.region_country, server.region_city].filter(Boolean).join(" · ");
@@ -69,7 +69,7 @@ export function historyRows(system: SystemResponse | undefined, range: DetailRan
     const row: ChartRow = { time, cpu: isNumber(resource.cpu[index]) ? resource.cpu[index] : null };
     for (const key of keys) {
       const value = maps[key].get(time);
-      row[key] = isNumber(value) && value >= 0 ? value / (key.endsWith("_used") ? 1e9 : key.endsWith("_speed") ? 1e6 : 1) : null;
+      row[key] = isNumber(value) && value >= 0 ? value / (key.endsWith("_used") ? 1024 ** 3 : key.endsWith("_speed") ? 1024 ** 2 : 1) : null;
     }
     return [row];
   });
