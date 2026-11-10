@@ -2,6 +2,7 @@ import {
   flagTwemojiFile,
   globeLabelWidth,
   layoutGlobeLabels,
+  visibleGlobeViewport,
   type GlobeLabelMetrics,
 } from "./globe-labels";
 
@@ -109,3 +110,23 @@ describe("globe labels", () => {
 });
 
 console.log("ok");
+const clipped = visibleGlobeViewport(
+  { x: 800, y: -48, width: 448, height: 448 },
+  { x: 0, y: 0, width: 1600, height: 202 },
+);
+assert.deepEqual(clipped, { x: 0, y: 48, width: 448, height: 202 });
+const rates = { height: 44, flag: 80, digit: 0, padding: 2, gap: 0, offset: 8, dotRadius: 4 };
+const topLabels = layoutGlobeLabels([{ code: "US", count: 1, x: 224, y: 58 }], rates, { cx: 224, cy: 224, r: 176 }, clipped);
+assert.equal(topLabels.length, 1);
+for (const latitude of [28, 48, 58, 100, 220, 248]) {
+  const labels = layoutGlobeLabels([{ code: "US", count: 1, x: 224, y: latitude }], rates, { cx: 224, cy: 224, r: 176 }, clipped);
+  for (const label of labels) {
+    assert.ok(label.x >= clipped.x && label.y >= clipped.y);
+    assert.ok(label.x + label.width <= clipped.x + clipped.width);
+    assert.ok(label.y + label.height <= clipped.y + clipped.height);
+  }
+}
+assert.deepEqual(visibleGlobeViewport(
+  { x: 0, y: -24, width: 336, height: 336 },
+  { x: 0, y: 0, width: 390, height: 400 },
+), { x: 0, y: 32, width: 448, height: 416 });

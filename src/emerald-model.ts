@@ -66,7 +66,7 @@ export function priceCards(server: ProbeServer, now: number): PriceCard[] {
   const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency;
   const price = isNumber(server.renewal_price_cny) ? server.renewal_price_cny : server.renewal_price;
   const hasPrice = isNumber(price) && price >= 0 && !!currency;
-  const free = price === 0;
+  const free = price === 0 || (server.renewal_cycle === "permanent" && server.renewal_price == null && server.renewal_price_cny == null);
   const money = (amount: number) => `${symbols[currency!] || ""}${amount.toFixed(2)}`;
   const days = server.renewal_cycle ? cycleDays[server.renewal_cycle] : undefined;
   const expiration = server.expires_at ? Date.parse(server.expires_at) : NaN;
@@ -76,7 +76,7 @@ export function priceCards(server: ProbeServer, now: number): PriceCard[] {
   else if (hasPrice) cards.push({ label: "节点价格", value: money(price), unit: `${currency}${server.renewal_cycle ? ` / ${cycleNames[server.renewal_cycle]}` : ""}` });
   if (hasPrice && !free && days) cards.push({ label: "月均支出", value: money(price / days * 30), unit: `${currency} / 月`, title: `按 ${days} 天计费周期折算 30 天月均支出，非实际账单` });
   if (remaining !== undefined) cards.push({ label: "剩余时间", value: remaining <= 0 ? "已到期" : `${Math.ceil(remaining)}`, unit: remaining > 0 ? "天" : undefined, tone: remaining > 7 ? "positive" : "warning", title: `到期时间：${new Date(expiration).toLocaleString("zh-CN", { hour12: false })}` });
-  else if (server.renewal_cycle === "permanent" && !free) cards.push({ label: "剩余时间", value: "长期" });
+  else if (server.renewal_cycle === "permanent") cards.push({ label: "剩余时间", value: "长期" });
   if (hasPrice && !free && days && remaining !== undefined) cards.push({ label: "剩余价值", value: money(price * Math.max(0, remaining) / days), unit: currency, title: `按剩余天数 / ${days} 天周期估算，非可退款金额` });
   return cards;
 }

@@ -44,6 +44,22 @@ for (const pricing of [{ renewal_price: 0, renewal_currency: "USD" }, { renewal_
   equal(freeDetail.includes("<strong>免费</strong>"), true);
   equal(freeCard.includes("undefined") || freeDetail.includes("undefined"), false);
 }
-equal(priceCards({ online: true, renewal_cycle: "permanent" }, 0).some(card => card.label === "节点价格"), false);
+for (const pricing of [{}, { renewal_price: null }, { renewal_price_cny: null }, { renewal_price: null, renewal_price_cny: null }]) {
+  const free: ProbeServer = JSON.parse(JSON.stringify({ online: true, renewal_cycle: "permanent", ...pricing }));
+  const cards = priceCards(free, 0);
+  equal(cards.find(card => card.label === "节点价格")?.value, "免费");
+  equal(cards.find(card => card.label === "节点价格")?.unit, undefined);
+  equal(cards.find(card => card.label === "剩余时间")?.value, "长期");
+  equal(cards.some(card => ["月均支出", "剩余价值"].includes(card.label)), false);
+  equal(financeSummary([free], 0).length, 0);
+  const paid: ProbeServer = { online: true, renewal_price_cny: 30, renewal_cycle: "month" };
+  equal(JSON.stringify(financeSummary([paid, free], 0)), JSON.stringify(financeSummary([paid], 0)));
+  equal(renderToStaticMarkup(<ServerCard server={free} index={0} now={0} onPing={() => {}} />).includes("免费"), true);
+  equal(renderToStaticMarkup(<ServerDetails server={free} index={0} updatedAt={0} />).includes("<strong>免费</strong>"), true);
+}
+equal(priceCards({ online: true, renewal_cycle: "month" }, 0).length, 0);
+equal(priceCards({ online: true, renewal_cycle: "permanent", renewal_price: 5, renewal_currency: "USD" }, 0)[0].value, "$5.00");
+equal(priceCards({ online: true, renewal_cycle: "permanent", renewal_price_cny: 10 }, 0)[0].value, "¥10.00");
+equal(priceCards({ online: true, renewal_cycle: "permanent", renewal_price: -1 }, 0).some(card => card.value === "免费"), false);
 equal(priceCards({ online: true }, 0).length, 0);
-equal(priceCards({ online: true, renewal_price: 0, renewal_cycle: "permanent" }, 0).length, 1);
+equal(priceCards({ online: true, renewal_price: 0, renewal_cycle: "permanent" }, 0).length, 2);

@@ -177,7 +177,7 @@ footer .connection { font-size: 11px; margin: 0; }
 .back-top { position: fixed; right: 20px; bottom: 24px; background: var(--surface); backdrop-filter: blur(8px); z-index: 10; }
 :root { --globe-center: #fff; --globe-edge: #f8fafc; --globe-rim: #fff; --globe-ink: #18181b; }
 :root.dark { --globe-center: #101820; --globe-edge: #17302d; --globe-rim: #28554a; --globe-ink: #89b4a4; }
-.fleet-summary { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 8px; height: 202px; margin-bottom: 16px; }
+.fleet-summary { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 8px; height: 202px; margin-bottom: 16px; overflow: hidden; overflow: clip; }
 .fleet-stats { grid-column: 1; grid-row: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); min-height: 0; gap: 8px; z-index: 2; }
 .fleet-stat { padding: 12px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 8px; background: var(--surface); text-align: left; min-width: 0; }
 .fleet-stat:hover { background: var(--background); }
@@ -192,6 +192,7 @@ footer .connection { font-size: 11px; margin: 0; }
 .fleet-globe, .fleet-globe * { user-select: none; -webkit-user-select: none; }
 .fleet-globe>svg:focus:not(:focus-visible) { outline: none; }
 .fleet-globe>svg:focus-visible { outline: 2px solid var(--green); outline-offset: -4px; border-radius: 50%; }
+.fleet-globe>svg:focus-visible .globe-focus { stroke: var(--green); stroke-width: 2; }
 .globe-sphere { filter: drop-shadow(0 0 5px var(--globe-rim)); }
 .globe-arcs { stroke: #3682ed; stroke-opacity: 1; }
 .dark .globe-arcs { stroke: #73bfff; }
