@@ -35,6 +35,19 @@ function payload() {
       download_speed: 2200000 + index * 580000 + revision * 1000,
       traffic_used: (128 + index * 73) * gib, traffic_limit: 1000 * gib,
       uptime: 86400 * (32 + index * 12), tcp_connections: 38 + revision, udp_connections: 12,
+      traffic_used_scope: "configured_period", traffic_source: "xray", traffic_stats_mode: "both",
+      ping: index === 4 ? [] : ["telecom", "unicom", "mobile"].filter((_, carrier) => index !== 1 || carrier !== 2).map((isp, carrier) => ({
+        key: `target-${carrier}`, isp, label: ["上海电信", "北京联通", "广州移动"][carrier],
+        current_ms: 36 + index * 24 + carrier * 13, loss_pct: carrier === 1 ? 2.5 : 0,
+        buckets: Array.from({ length: 24 }, (_, bucket) => ({
+          ms: bucket === 7 && carrier === 2 ? -1 : 30 + index * 24 + carrier * 13 + Math.sin(bucket * 0.7) * 20,
+          loss: bucket === 7 && carrier === 2 ? 100 : bucket % 9 === carrier ? 2.5 : 0,
+        })),
+      })),
+      return_routes: index === 4 ? [] : ["telecom", "unicom", "mobile"].map((carrier, route) => ({
+        carrier, region: ["上海", "北京", "广州"][route], route_type: ["CN2 GIA", "AS9929", "CMI"][route],
+        tested_at: "2026-11-10T00:00:00Z",
+      })),
     })),
   };
 }

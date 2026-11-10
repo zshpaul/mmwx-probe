@@ -6,6 +6,8 @@ import type { ProbePayload, ProbePingSeries, ProbeServer } from "./types";
 import { effectiveProbeRange, probeRangeOptions, probeRangeBucketSec, probeRangeBucketCount } from "./probe-ranges";
 import { resourceHistoryFromSeries, type ResourceSeriesInput } from "./resource-history";
 import type { ProbeMetricPoint } from "./conn-sparkline";
+import { NodeTelemetry } from "./NodeTelemetry";
+import { cpuCoreUsage } from "./telemetry-display";
 
 export const designAttribution = "Adapted for MMWX Probe from Nezha user-frontend-backup / nezha-dash by hamster1963 and contributors (Apache-2.0); layout, styling and data integration modified. See /THIRD_PARTY_NOTICES.txt.";
 const Trend = lazy(() => import("./Trend"));
@@ -22,18 +24,19 @@ const speed = (value?: number) => number(value) ? `${bytes(value, 1000)}/s` : "�
 const percent = (value?: number) => number(value) ? `${value!.toFixed(1)}%` : "—";
 const locationName = (server: ProbeServer) => [server.region_name || server.region || server.region_country, server.region_city].filter(Boolean).join(" · ") || "地区未设置";
 
-function Usage({ label, value }: { label: string; value?: number }) {
-  return <div className="usage"><div><span>{label}</span><strong>{percent(value)}</strong></div><div className="track"><i className={value !== undefined && value > 90 ? "danger" : value !== undefined && value > 70 ? "warning" : ""} style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} /></div></div>;
+function Usage({ label, value, quantity }: { label: string; value?: number; quantity?: string }) {
+  return <div className="usage"><div><span>{label}</span><strong>{percent(value)}</strong></div>{quantity && <p className="resource-quantity">{quantity}</p>}<div className="track"><i className={value !== undefined && value > 90 ? "danger" : value !== undefined && value > 70 ? "warning" : ""} style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} /></div></div>;
 }
 
-function ServerCard({ server, index }: { server: ProbeServer; index: number }) {
+function ServerCard({ server, index, tri }: { server: ProbeServer; index: number; tri: ProbePayload["tri_isp"] }) {
   const online = server.online;
   return <a className={`server-card ${online ? "" : "offline"}`} href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>
     <div className="server-identity"><span className={`status-dot ${online ? "" : "down"}`} /><div className="identity-copy"><h2>{server.name || `节点 ${index + 1}`}</h2><p>{locationName(server)}</p></div><ChevronRight size={16} className="chevron" /></div>
     <div className="spec"><span>{server.os || "系统未上报"}</span><span>{server.cpu_cores ? `${server.cpu_cores} 核` : "—"} · {bytes(server.mem_total)}</span></div>
-    <div className="resource-grid"><Usage label="CPU" value={online ? server.cpu_pct : undefined} /><Usage label="内存" value={online ? ratio(server.mem_used, server.mem_total) : undefined} /><Usage label="硬盘" value={online ? ratio(server.disk_used, server.disk_total) : undefined} /></div>
+    <div className="resource-grid"><Usage label="CPU" value={online ? server.cpu_pct : undefined} quantity={cpuCoreUsage(online ? server.cpu_pct : undefined, server.cpu_cores)} /><Usage label="内存" value={online ? ratio(server.mem_used, server.mem_total) : undefined} quantity={`${bytes(online ? server.mem_used : undefined)} / ${bytes(server.mem_total)}`} /><Usage label="硬盘" value={online ? ratio(server.disk_used, server.disk_total) : undefined} quantity={`${bytes(online ? server.disk_used : undefined)} / ${bytes(server.disk_total)}`} /></div>
     <div className="network-grid"><div><span><ArrowUp size={13} />上传</span><strong>{online ? speed(server.upload_speed) : "—"}</strong></div><div><span><ArrowDown size={13} />下载</span><strong>{online ? speed(server.download_speed) : "—"}</strong></div></div>
-    <div className="card-bottom"><span className={online ? "online-text" : "offline-text"}>{online ? "在线" : "离线"}<span className="uptime">{online && number(server.uptime) ? ` · 已运行 ${Math.floor(server.uptime! / 86400)} 天` : ""}</span></span><span>流量 {bytes(server.traffic_used)}</span></div>
+    <NodeTelemetry server={server} tri={tri} formatBytes={bytes} />
+    <div className="card-bottom"><span className={online ? "online-text" : "offline-text"}>{online ? "在线" : "离线"}<span className="uptime">{online && number(server.uptime) ? ` · 已运行 ${Math.floor(server.uptime! / 86400)} 天` : ""}</span></span></div>
   </a>;
 }
 
@@ -110,8 +113,9 @@ function Details({ server, index, data }: { server: ProbeServer; index: number; 
     <a className="back-link" href="#"><ArrowLeft size={16} />返回节点列表</a>
     <section className="detail-header"><div><div className="eyebrow">节点详情</div><h1><span className={`status-dot ${server.online ? "" : "down"}`} />{server.name || `节点 ${index + 1}`}</h1><p>{locationName(server)} · {server.os || "系统未上报"} · {server.arch || "架构未上报"}</p></div><span className={`badge ${server.online ? "online-text" : "offline-text"}`}>{server.online ? "运行中" : "已离线"}</span></section>
     {!server.online && <div className="notice">节点离线，当前指标为最后上报值。最后心跳：{server.last_seen ? new Date(server.last_seen).toLocaleString("zh-CN") : "未提供"}</div>}
-    <section className="detail-metrics"><div><Usage label="CPU 使用率" value={server.cpu_pct} /><p>{server.cpu_cores ? `${server.cpu_cores} 核 · ` : ""}{server.cpu_model || "型号未上报"}</p></div><div><Usage label="内存使用率" value={ratio(server.mem_used, server.mem_total)} /><p>{bytes(server.mem_used)} / {bytes(server.mem_total)}</p></div><div><Usage label="硬盘使用率" value={ratio(server.disk_used, server.disk_total)} /><p>{bytes(server.disk_used)} / {bytes(server.disk_total)}</p></div></section>
+    <section className="detail-metrics"><div><Usage label="CPU 使用率" value={server.cpu_pct} quantity={cpuCoreUsage(server.cpu_pct, server.cpu_cores)} /><p>{server.cpu_model || "型号未上报"}</p></div><div><Usage label="内存使用率" value={ratio(server.mem_used, server.mem_total)} quantity={`${bytes(server.mem_used)} / ${bytes(server.mem_total)}`} /></div><div><Usage label="硬盘使用率" value={ratio(server.disk_used, server.disk_total)} quantity={`${bytes(server.disk_used)} / ${bytes(server.disk_total)}`} /></div></section>
     <section className="detail-facts"><div><span>实时上传</span><strong>{speed(server.upload_speed)}</strong></div><div><span>实时下载</span><strong>{speed(server.download_speed)}</strong></div><div><span>已用 / 配额</span><strong>{bytes(server.traffic_used)} / {bytes(server.traffic_limit)}</strong></div><div><span>TCP / UDP 连接</span><strong>{server.tcp_connections ?? "—"} / {server.udp_connections ?? "—"}</strong></div></section>
+    <NodeTelemetry server={server} tri={data.tri_isp} formatBytes={bytes} />
     <div className="section-heading"><div><h2>历史趋势</h2><p>按采样时间展示 · 每 30 秒刷新</p></div><select aria-label="历史时间范围" value={range} onChange={event => setRange(event.target.value)}>{options.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></div>
     <Suspense fallback={<div className="empty">正在加载图表…</div>}><div className="charts">
       <Trend title="系统资源" unit="%" rows={resourceRows} lines={[{ key: "cpu", name: "CPU" }, { key: "mem", name: "内存" }, { key: "disk", name: "硬盘" }]} loading={loading} error={history.systemError} domain={[0, 100]} />
@@ -157,7 +161,7 @@ export function App() {
     {!data ? <main className="empty"><Activity size={28} /><h1>{error ? "暂时无法连接" : "正在连接探针…"}</h1><p>正在获取节点状态</p></main> : !data.enabled ? <main className="empty"><h1>探针尚未启用</h1><p>请在主控中开启公开探针。</p></main> : selected !== undefined ? servers[selected] ? <Details key={selected} server={servers[selected]} index={selected} data={data} /> : <main className="empty"><h1>节点不存在或已移除</h1><a href="#">返回节点列表</a></main> : <main>
       <div className="section-heading home-heading"><div><div className="eyebrow">基础设施 / 节点</div><h1>服务器</h1><p>每一个节点，尽在掌握。</p></div><div className="view-switch" role="group" aria-label="显示方式"><button aria-label="卡片视图" aria-pressed={view === "grid"} onClick={() => setView("grid")}><LayoutGrid size={17} /></button><button aria-label="列表视图" aria-pressed={view === "list"} onClick={() => setView("list")}><List size={18} /></button></div></div>
       <div className="toolbar"><div className="tabs" role="group" aria-label="状态筛选">{[["all", "全部"], ["online", "在线"], ["offline", "离线"]].map(([key, label]) => <button key={key} aria-pressed={status === key} onClick={() => setStatus(key)}>{label}<span>{servers.filter(server => key === "all" || server.online === (key === "online")).length}</span></button>)}</div><div className="search-controls"><select aria-label="地区筛选" value={region} onChange={event => setRegion(event.target.value)}><option value="all">全部地区</option>{regions.map(item => <option key={item}>{item}</option>)}</select><label className="search"><Search size={15} /><input aria-label="搜索节点" placeholder="搜索名称、地区、系统…" value={search} onChange={event => setSearch(event.target.value)} /></label></div></div>
-      {visible.length ? <div className={`servers ${view}`}>{visible.map(({ server, index }) => <ServerCard key={index} server={server} index={index} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length ? "没有匹配的节点" : "暂无服务器"}</h2><p>{servers.length ? "试试其他名称或筛选条件。" : "请在主控中选择需要展示的服务器。"}</p>{servers.length > 0 && <button onClick={() => { setSearch(""); setStatus("all"); setRegion("all"); }}>清除筛选</button>}</div>}
+      {visible.length ? <div className={`servers ${view}`}>{visible.map(({ server, index }) => <ServerCard key={index} server={server} index={index} tri={data.tri_isp} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length ? "没有匹配的节点" : "暂无服务器"}</h2><p>{servers.length ? "试试其他名称或筛选条件。" : "请在主控中选择需要展示的服务器。"}</p>{servers.length > 0 && <button onClick={() => { setSearch(""); setStatus("all"); setRegion("all"); }}>清除筛选</button>}</div>}
       <div className="list-end"><span>显示 {visible.length} 个节点</span><span>更新于 {updatedAt ? new Date(updatedAt).toLocaleTimeString("zh-CN", { hour12: false }) : "—"}</span></div>
     </main>}
     <footer><span>MMWX Probe <span className="footer-dot">·</span> Powered by <a href="https://github.com/mmwx-group" target="_blank" rel="noreferrer">MMWX Group</a></span>{data?.license_badge && <span>授权信息：{data.license_badge.display_name || data.license_badge.name || "MMWX"}</span>}<a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">Design adapted from Nezha / nezha-dash ↗</a></footer>
