@@ -16,3 +16,10 @@ check(markup.includes("<strong>10</strong><small> / 100</small>"), "Disk totals 
 check(markup.includes("不标注精确机房坐标"), "Geographic illustration must not imply measured coordinates");
 check((markup.match(/class="fleet-stat"/g) || []).length === 6, "All six overview cards must render");
 check(markup.includes("计费流量") && markup.includes("剩余价值"), "Fallback scope and finance must stay visible");
+const globeServers = [{ online: true, region_country: "HK" }, { online: true, region_country: "JP" }];
+const withVisitor = renderToStaticMarkup(<FleetSummary servers={globeServers} formatBytes={String} visitorCountryCode="US" />);
+const withoutVisitor = renderToStaticMarkup(<FleetSummary servers={globeServers} formatBytes={String} />);
+const invalidVisitor = renderToStaticMarkup(<FleetSummary servers={globeServers} formatBytes={String} visitorCountryCode="XX" />);
+check((withVisitor.match(/节点国家至访客国家的示意连线/g) || []).length === 2, "Each node country connects to visitor country");
+check(!withoutVisitor.includes("节点国家至访客国家的示意连线") && !invalidVisitor.includes("节点国家至访客国家的示意连线"), "No visitor means no arcs");
+check(withVisitor.includes('stroke-width="0.8"'), "Emerald arc width");

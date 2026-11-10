@@ -10,6 +10,7 @@ import { billableTraffic } from "./traffic-display";
 import { financeSummary, speed } from "./emerald-model";
 import { RegionFlag } from "./ServerSymbols";
 import { layoutGlobeLabels } from "./globe-labels";
+import { arcPath, sampleArc } from "./globe-arcs";
 
 const world = atlas as unknown as Topology;
 const land = feature(world, world.objects.land);
@@ -33,7 +34,7 @@ const sum = (values: (number | undefined)[]) => {
   const present = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
   return present.length ? present.reduce((total, value) => total + value, 0) : undefined;
 };
-function Globe({ servers }: { servers: ProbeServer[] }) {
+function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visitorCountryCode?: string }) {
   const identifier = useId().replaceAll(":", "");
   const [rotation, setRotation] = useState<[number, number]>([-105, -20]);
   const dragging = useRef(false);
@@ -53,6 +54,11 @@ function Globe({ servers }: { servers: ProbeServer[] }) {
     }
     return [...grouped].map(([code, nodes]) => ({ code, nodes, coordinate: coordinates.get(code)! }));
   }, [servers]);
+  const visitorCoordinate = coordinates.get(visitorCountryCode || "");
+  const arcs = visitorCoordinate ? clusters.map(cluster => ({
+    code: cluster.code,
+    path: arcPath(sampleArc(projection, cluster.coordinate, visitorCoordinate, 64, .4)),
+  })) : [];
   const path = dots.filter(point => geoDistance(center, point) < Math.PI / 2).map(point => {
     const [left, top] = projection(point)!;
     const radius = .75 * Math.max(.25, Math.cos(geoDistance(center, point)));
@@ -73,6 +79,7 @@ function Globe({ servers }: { servers: ProbeServer[] }) {
       <defs><radialGradient id={`${identifier}-sphere`} cx="40%" cy="35%"><stop stopColor="var(--globe-center)" /><stop offset=".83" stopColor="var(--globe-edge)" /><stop offset="1" stopColor="var(--globe-rim)" /></radialGradient><clipPath id={`${identifier}-labels`}><rect width="448" height="250" /></clipPath></defs>
       <circle cx="224" cy="224" r="176" fill={`url(#${identifier}-sphere)`} className="globe-sphere" />
       <path d={path} stroke="var(--globe-ink)" strokeWidth="1.5" strokeLinecap="round" />
+      <g className="globe-arcs" fill="none" strokeWidth={0.8} pointerEvents="none">{arcs.map(arc => <path key={arc.code} d={arc.path}><title>节点国家至访客国家的示意连线</title></path>)}</g>
       <g className="globe-labels" clipPath={`url(#${identifier}-labels)`}>{visible.map(cluster => {
         const onlineNodes = cluster.nodes.filter(server => server.online);
         const label = labels.find(label => label.code === cluster.code);
@@ -82,7 +89,7 @@ function Globe({ servers }: { servers: ProbeServer[] }) {
     <div className="fleet-status" title={`${online} 在线 · ${servers.length - online} 离线`}><span className="positive">● {online}</span><span className="warning">● {servers.length - online}</span></div>
   </div>;
 }
-export function FleetSummary({ servers, formatBytes, now = Date.now() }: { servers: ProbeServer[]; formatBytes: (value?: number) => string; now?: number }) {
+export function FleetSummary({ servers, formatBytes, now = Date.now(), visitorCountryCode }: { servers: ProbeServer[]; formatBytes: (value?: number) => string; now?: number; visitorCountryCode?: string }) {
   const financeDialog = useRef<HTMLDialogElement>(null);
   const online = servers.filter(server => server.online);
   const memory = online.filter(server => Number.isFinite(server.mem_used) && Number.isFinite(server.mem_total));
@@ -101,7 +108,7 @@ export function FleetSummary({ servers, formatBytes, now = Date.now() }: { serve
     { label: "实时下行", ...split(speed(sum(online.map(server => server.download_speed)))), icon: ChevronDown, title: "在线节点已上报下行速率合计" },
   ];
   return <section className="fleet-summary" aria-label="节点统计与地区分布">
-    <Globe servers={servers} />
+    <Globe servers={servers} visitorCountryCode={visitorCountryCode} />
     <div className="fleet-stats">{stats.map(({ label, value, note, suffix, icon: Icon, title }) => {
       const content = <><span>{label}<Icon size={20} /></span><p><strong>{value}</strong><small>{note} {suffix}</small></p></>;
       return label === "剩余价值" ? <button className="fleet-stat" key={label} title={title} onClick={() => financeDialog.current?.showModal()}>{content}</button> : <div className="fleet-stat" key={label} title={title}>{content}</div>;

@@ -32,7 +32,7 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 
 ### Emerald 展示约定
 
-视觉取值来自 `Tokinx/cf-server-monitor-theme-emerald` 的固定提交 `c80591198df4d2a0332b86b41e53e42fd341ed99`，对应 `CF-Server-Monitor` 提交 `612027cbdb248bc2df7e69f9d01b5cefb4d14fa8`。仅翻译前端，不接入对方后端、品牌、个人内容或访客定位服务。
+视觉取值来自 `Tokinx/cf-server-monitor-theme-emerald` 的固定提交 `c80591198df4d2a0332b86b41e53e42fd341ed99`，对应 `CF-Server-Monitor` 提交 `612027cbdb248bc2df7e69f9d01b5cefb4d14fa8`。仅翻译前端，不接入对方后端、品牌、个人内容或第三方访客定位服务。
 
 - `styles/main.css`：沿用前景色、灰度、字体和 `--radius: .625rem`；`rounded-md` 换算为 8px。
 - `Background.vue`：1300 × 400px 的 emerald-500 → lime-300 渐变、40% 透明度、顶部径向蒙版、72 × 56px 倾斜网格。
@@ -47,10 +47,18 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 - 延迟历史使用 `/api/series` 的 `all_series`、`generated_at`、`bucket_sec`、`buckets`；提供范围切换、目标全选/全不选、延迟/丢包开关和 tooltip。平滑采用 EWMA α=0.3，保留缺测断点，不补造原始样本；关闭即可查看原始值。
 - 总览资源/速率只汇总在线有效上报值，累计流量使用 `cumulative_up/down`；没有累计计数时明确显示“计费流量”，按各节点自身计费周期合计。剩余价值从价格/周期/到期时间推导，缺项排除；价值弹窗按币种分别汇总，不请求或假造汇率。
 - 地球使用国家级地理示意位置并显示实际地区聚合速率；可自动旋转、拖动和键盘旋转，尊重减少动画偏好。桌面端速率标签绘制限于总览区，卡片与工具栏位于球体前方，避免遮挡节点标题和点击；球体保持完整外观。
-- Emerald `NodeEarthGlobe.vue` 的弧线由 COBE 绘制（`arcWidth: 0.8`、`arcHeight: 0.4`）：`from` 为每个节点国家聚合点，`to` 为访客国家代表坐标，二者均由 `geoHelper.getCoordByCode` 查表获得，并非节点互连或精确城市路径。代码要求访客卡启用且访客国家能映射到坐标，否则直接返回 `[]`；注释虽提到 hub 回退，实际代码没有实现。当前三个公开接口没有访客国家，本页遵循无访客时不画弧线的行为，不编造位置、不新增定位请求。
-- Emerald `VisitorInfoCard.vue` 在浏览器依次尝试 `api.ip.sb/geoip`、`ipwho.is/`、`api.ipapi.is/`、`ipapi.co/json/`、`api.vore.top/api/IPdata`，前四个各超时 4 秒、最后 5 秒；成功后写入 `visitorCountryCode`。国家/城市、IP 和运营商来自这些第三方，设备与浏览器来自本地 `navigator.userAgent`。收起时 IPv4 仅遮盖第三段（星号数等于该段长度），IPv6 保留至多前四段；展开会显示完整 IP。此底栏未接入本项目。
+- Emerald `NodeEarthGlobe.vue` 的弧线由 COBE 绘制（`arcWidth: 0.8`、`arcHeight: 0.4`）：`from` 为每个节点国家聚合点，`to` 为访客国家代表坐标，并非节点互连或精确城市路径。这里将相同连接规则适配到现有 SVG 地球：复用国家代表坐标，线宽 0.8、沿大圆抬升系数 0.4，背面遮挡段不绘制。访客国家来自 `/api/visitor`；缺失或无法映射坐标时返回空连线，不使用 hub 或虚构位置。
+- Emerald 原版 `VisitorInfoCard.vue` 通过浏览器直接请求 IP.SB 等第三方 GeoIP；本项目采用同源 Cloudflare 元数据方案，不复制其第三方请求或展开原始 IP 功能。
 - 原站后台配置（分组、自定义标签、背景、地球模式、价格可见性等）不在本项目公开 API 的配置契约内，不创建无功能设置按钮；现有 passkey 实现保留，仅不渲染页面入口。GPU/Swap/进程等缺失字段不填假数据；回程路线没有对应原站区域，不额外混入卡片。
 - 按当前用户要求，卡片底部“溢价 / 无溢价 / free”等灰框自定义标签及列表同类标签不展示。
+
+### 访客信息与隐私
+
+`GET /api/visitor` 在 `worker/index.ts` 独立路由到 `worker/visitor.ts`，不代理主控、不要求 `PROBE_TOKEN`、不请求任何第三方。只读取 Cloudflare 注入的 `request.cf.country/city/region` 和 `CF-Connecting-IP`，返回 `{ countryCode, city, region, maskedIp }`；缺失或无效值为空字符串。响应（包括 405）使用 `Cache-Control: private, no-store`，只接受 GET。IPv4 校验后遮盖第三段（星号数等于原段位数）；IPv6 校验并展开后仅保留前四段，后四段整体替换为 `*`，包括压缩与 IPv4 映射形式。接口不返回也不记录原始 IP，不读取其他 IP 转发头。
+
+`VisitorInfo.tsx` 只请求这个同源接口；国家名称在前端由国家码转换，城市缺失回退到地区，完全未知时显示“网络访客 / 暂无法获取”。浏览器由 `navigator.userAgent` 本地识别。悬浮条没有显示完整 IP 的入口。访客国家只用于国家级示意连线，不代表精确位置或真实网络链路；监控指标仍来自原有 `/api/probe`、`/api/series`、`/api/stream`。
+
+本地开发没有 Cloudflare 元数据时，空字段和无弧线是预期结果；截图可用明确标注的本地 mock。以后迁移自有服务器可保留接口契约，但应替换元数据来源（受信反代头或本地 GeoIP 数据库），不能把任意客户端提交的转发头当作可信定位。
 
 详情按 `src/types.ts` 和系统序列接入实际字段，缺失的格子直接隐藏：
 

@@ -182,6 +182,14 @@ footer .connection { font-size: 11px; margin: 0; }
 .fleet-globe>svg { width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .fleet-globe>svg:active { cursor: grabbing; }
 .globe-sphere { filter: drop-shadow(0 0 5px var(--globe-rim)); }
+.globe-arcs { stroke: #3682ed; }
+.dark .globe-arcs { stroke: #73bfff; }
+.visitor-info { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; width: max-content; max-width: calc(100vw - 24px); padding: 6px 12px; border-radius: 999px; background: color-mix(in oklab, var(--background) 30%, transparent); backdrop-filter: blur(12px); box-shadow: -1px -1px 0 var(--background), 0 0 16px #0000000d; font-size: 11px; color: var(--muted); }
+.visitor-info>span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.visitor-location { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.visitor-info>span+span { border-left: 1px solid var(--border); padding-left: 10px; white-space: nowrap; flex-shrink: 0; }
+.visitor-info svg { color: var(--green); flex-shrink: 0; }
+footer { padding-bottom: 56px; }
 .fleet-status { position: absolute; top: 48px; left: 0; display: flex; gap: 8px; padding: 2px 8px; background: var(--surface); border-radius: 4px; font-size: 10px; pointer-events: none; }
 .globe-rate { background: var(--surface); border-radius: 2px; padding: 2px 3px; width: max-content; font-size: 10px; line-height: 12px; }
 .globe-rate span { display: block; }
@@ -255,6 +263,8 @@ dialog::backdrop { background: #0008; }
   .price-card { min-height: 64px; }
 }
 @media (max-width: 639px) {
+  .visitor-info { font-size: 10px; padding: 6px 8px; gap: 6px; }
+  .visitor-info>span+span { padding-left: 6px; }
   .shell { padding: 0 16px; }
   .topbar { min-height: 56px; }
   .brand { font-size: 18px; }

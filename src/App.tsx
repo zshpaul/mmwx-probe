@@ -4,6 +4,8 @@ import { useProbe, applyAppearance, saveColorModePreference, readColorModePrefer
 import { nextColorMode } from "./theme-preference";
 import type { ProbePayload, ProbeServer } from "./types";
 import { FleetSummary } from "./FleetSummary";
+import { VisitorInfo } from "./VisitorInfo";
+import type { VisitorData } from "./visitor-model";
 import { EmeraldPingSummary, PingDialog } from "./EmeraldPing";
 import { ServerDetails } from "./ServerDetails";
 import { ServerList } from "./ServerList";
@@ -47,6 +49,7 @@ function Background() {
   return <div className="emerald-background" aria-hidden="true"><div className="background-glow"><svg><defs><pattern id="emerald-grid" width="72" height="56" patternUnits="userSpaceOnUse" x="-12" y="4"><path d="M.5 56V.5H72" fill="none" /></pattern></defs><rect width="100%" height="100%" strokeWidth="0" fill="url(#emerald-grid)" /><svg x="-12" y="4">{[[288, 168], [144, 56], [504, 168], [720, 336]].map(([left, top]) => <rect key={left} strokeWidth="0" width="73" height="57" x={left} y={top} />)}</svg></svg></div></div>;
 }
 export function App() {
+  const [visitor, setVisitor] = useState<VisitorData>();
   const { data, error, connection, updatedAt } = useProbe();
   const [selected, setSelected] = useState(selectedIndex);
   const [search, setSearch] = useState("");
@@ -74,10 +77,11 @@ export function App() {
     {error && <div className="notice error" role="alert">无法更新探针数据（{error}）。{data ? "当前保留最后一次快照，正在自动重试。" : "正在自动重试，请检查服务连接。"}</div>}
     {!data ? <main className="empty"><Activity size={28} /><h1>{error ? "暂时无法连接" : "正在连接探针…"}</h1></main> : !data.enabled ? <main className="empty"><h1>探针尚未启用</h1><p>请在主控中开启公开探针。</p></main> : selected !== undefined ? servers[selected] ? <ServerDetails key={selected} server={servers[selected]} index={selected} updatedAt={updatedAt} /> : <main className="empty"><h1>节点不存在或已移除</h1><a href="#">返回节点列表</a></main> : <main className="home">
       <h1 className="sr-only">节点监控</h1>
-      <FleetSummary servers={servers} formatBytes={bytes} now={updatedAt ?? Date.now()} />
+      <FleetSummary servers={servers} visitorCountryCode={visitor?.countryCode} formatBytes={bytes} now={updatedAt ?? Date.now()} />
       <div className="toolbar"><span className="group-tab">全部节点</span><div className="view-tools"><div className="view-switch" role="group" aria-label="显示方式"><button aria-label="卡片视图" title="卡片视图" aria-pressed={view === "grid"} onClick={() => setView("grid")}><LayoutGrid size={14} /></button><button aria-label="列表视图" title="列表视图" aria-pressed={view === "list"} onClick={() => setView("list")}><Table2 size={14} /></button></div><label className={`search ${search ? "has-value" : ""}`}><Search size={14} /><input aria-label="搜索节点" placeholder="搜索节点名称、地区、系统" value={search} onChange={event => setSearch(event.target.value)} /></label></div></div>
       {visible.length ? view === "list" ? <ServerList nodes={visible} tri={data.tri_isp} onPing={setPingNode} /> : <div className="servers grid">{visible.map(({ server, index }) => <ServerCard key={index} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length ? "没有匹配的节点" : "暂无服务器"}</h2>{servers.length > 0 && <button onClick={() => setSearch("")}>清除搜索</button>}</div>}
     </main>}
+    <VisitorInfo onVisitor={setVisitor} />
     {pingNode !== undefined && servers[pingNode] && <PingDialog server={servers[pingNode]} index={pingNode} onClose={() => setPingNode(undefined)} />}
     <footer><span>Powered by MMWX Probe</span><span className="connection" title={updatedAt ? `更新于 ${new Date(updatedAt).toLocaleTimeString("zh-CN")}` : undefined}><span className={`status-dot ${error ? "down" : connection === "live" ? "" : "pending"}`} />{error ? "连接异常" : connection === "live" ? "实时连接" : "HTTP 轮询"}</span><a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">Theme by Emerald</a></footer>
     {scrolled && <button className="back-top icon-button" aria-label="返回顶部" title="返回顶部" onClick={() => window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })}><ArrowUp size={16} /></button>}

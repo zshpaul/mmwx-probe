@@ -31,13 +31,13 @@ export function sampleArc(
   from: [number, number],
   to: [number, number],
   segments = 64,
+  altitude = arcAltitude(from, to),
 ): ArcPoint[] {
   const [cx, cy] = projection.translate();
   const radius = projection.scale();
   const center = projection.invert?.([cx, cy]);
   if (!center) return [];
   const interpolate = geoInterpolate(from, to);
-  const altitude = arcAltitude(from, to);
   const points: ArcPoint[] = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;

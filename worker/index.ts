@@ -1,3 +1,5 @@
+import { visitorResponse } from "./visitor";
+
 interface Env {
   ASSETS: Fetcher;
   MMWX_ORIGIN: string;
@@ -112,6 +114,7 @@ function fromOwnPage(request: Request, self: string): boolean {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const incoming = new URL(request.url);
+    if (incoming.pathname === "/api/visitor") return visitorResponse(request);
     if (incoming.pathname === "/login") {
       return Response.redirect(
         new URL("/login", env.MMWX_ORIGIN).toString(),
