@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ProbeAppearance, ProbePayload, ThemeName } from "./types";
-import { applyProbeDocumentBranding } from "./document-branding";
 import { normalizeColorMode, type ProbeColorMode } from "./theme-preference";
+import { requestJson } from "./request-json";
 
 const APPEARANCE_CACHE = "mmwx-probe-appearance";
 const COLOR_MODE_PREFERENCE = "mmwx-probe-color-mode";
@@ -11,7 +11,7 @@ function normalizeTheme(value?: string): ThemeName {
   return theme && /^[A-Za-z0-9_-]{1,64}$/.test(theme) ? theme : "pixel";
 }
 
-export function applyAppearance(input?: ProbeAppearance) {
+export function applyAppearance(input?: ProbeAppearance, override?: ProbeColorMode) {
   const cached = (() => {
     try {
       return JSON.parse(
@@ -23,7 +23,7 @@ export function applyAppearance(input?: ProbeAppearance) {
   })();
   const appearance = input || cached || { theme: "pixel", color_mode: "light" };
   const theme = normalizeTheme(appearance.theme);
-  const colorMode = readColorModePreference(appearance.color_mode);
+  const colorMode = override ?? readColorModePreference(appearance.color_mode);
   const root = document.documentElement;
   for (const className of Array.from(root.classList)) {
     if (className.startsWith("theme-")) root.classList.remove(className);
@@ -67,66 +67,94 @@ export function saveColorModePreference(mode: ProbeColorMode) {
   }
 }
 
-export function useProbe(): { data?: ProbePayload; error?: string } {
+export function useProbe(): { data?: ProbePayload; error?: string; connection: "live" | "polling"; updatedAt?: number } {
   const [data, setData] = useState<ProbePayload>();
   const [error, setError] = useState<string>();
-  const timer = useRef<number | undefined>(undefined);
+  const [connection, setConnection] = useState<"live" | "polling">("polling");
+  const [updatedAt, setUpdatedAt] = useState<number>();
 
   useEffect(() => {
     let stopped = false;
     let ws: WebSocket | undefined;
-
+    let reconnectTimer: number | undefined;
+    let lastFrame = 0;
+    let openedAt = 0;
+    let retries = 0;
+    let pending = false;
+    const controller = new AbortController();
     const accept = (payload: ProbePayload) => {
       if (stopped) return;
+      if (!payload || typeof payload.enabled !== "boolean") throw new Error("探针响应格式无效");
       applyAppearance(payload.appearance);
       setData(payload);
       setError(undefined);
-      applyProbeDocumentBranding(payload.title, payload.icon);
+      setUpdatedAt(Date.now());
+      document.title = "ZSH";
     };
     const poll = async () => {
+      if (stopped || pending || (lastFrame && Date.now() - lastFrame < 12000)) return;
+      pending = true;
+      const startedAt = Date.now();
       try {
-        const response = await fetch("/api/probe", { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        accept((await response.json()) as ProbePayload);
+        const payload = await requestJson<ProbePayload>("/api/probe", { cache: "no-store", signal: controller.signal });
+        if (lastFrame <= startedAt) {
+          accept(payload);
+          if (!stopped) setConnection("polling");
+        }
       } catch (cause) {
-        if (!stopped)
+        if (!stopped && lastFrame <= startedAt)
           setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        pending = false;
       }
     };
-    const startPolling = () => {
-      if (timer.current) return;
+    const reconnect = () => {
+      if (stopped) return;
+      lastFrame = 0;
+      setConnection("polling");
       void poll();
-      timer.current = window.setInterval(poll, 5000);
+      if (reconnectTimer !== undefined) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = undefined;
+        connect();
+      }, Math.min(30000, 1000 * 2 ** Math.min(retries++, 5)));
     };
-
+    const connect = () => {
+      if (stopped) return;
+      try {
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        const socket = new WebSocket(`${protocol}//${location.host}/api/stream`);
+        ws = socket;
+        openedAt = Date.now();
+        socket.onmessage = (event) => {
+          if (stopped || socket !== ws) return;
+          try {
+            accept(JSON.parse(event.data) as ProbePayload);
+            lastFrame = Date.now();
+            retries = 0;
+            setConnection("live");
+          } catch {}
+        };
+        socket.onerror = () => socket.close();
+        socket.onclose = reconnect;
+      } catch { reconnect(); }
+    };
     applyAppearance();
-    // Keep polling as a fallback even when the WebSocket handshake succeeds.
-    // Some proxies leave an idle WebSocket open without forwarding later frames,
-    // which otherwise freezes realtime speed at the first snapshot.
-    startPolling();
-    try {
-      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${protocol}//${location.host}/api/stream`);
-      ws.onmessage = (event) => {
-        try {
-          accept(JSON.parse(event.data) as ProbePayload);
-        } catch {
-          /* wait for next frame */
-        }
-      };
-      ws.onerror = startPolling;
-      ws.onclose = startPolling;
-    } catch {
-      startPolling();
-    }
-
+    document.title = "ZSH";
+    void poll();
+    connect();
+    const timer = window.setInterval(() => {
+      if (ws && Date.now() - (lastFrame || openedAt) > 15000) ws.close();
+      void poll();
+    }, 5000);
     return () => {
       stopped = true;
+      controller.abort();
+      window.clearInterval(timer);
+      window.clearTimeout(reconnectTimer);
       ws?.close();
-      if (timer.current) window.clearInterval(timer.current);
-      timer.current = undefined;
     };
   }, []);
 
-  return { data, error };
+  return { data, error, connection, updatedAt };
 }

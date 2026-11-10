@@ -1,0 +1,59 @@
+MMWX Probe — third-party design and source acknowledgements
+
+Emerald Theme for CF Server Monitor
+Copyright (c) 2026 Tokinx
+Source: https://github.com/Tokinx/cf-server-monitor-theme-emerald
+Pinned revision: c80591198df4d2a0332b86b41e53e42fd341ed99
+License: MIT
+Full copyright and license: /licenses/emerald-MIT.txt
+
+CF Server Monitor
+Copyright (c) 2026 huilang-me
+Source: https://github.com/huilang-me/CF-Server-Monitor
+Pinned revision: 612027cbdb248bc2df7e69f9d01b5cefb4d14fa8
+License: MIT
+Full copyright and license: /licenses/cf-server-monitor-MIT.txt
+
+The Emerald HomeView, NodeCard and InstanceDetail visual layout informed the
+React implementation in App.tsx, FleetSummary.tsx, NodeTelemetry.tsx and
+emerald.css: mint background, summary tiles, compact resource cards, dotted
+globe illustration and grouped detail panels. The existing MMWX API contract
+is preserved. No upstream Vue application, agent, D1, Durable Objects,
+authentication backend or hosted site's branding/personal content is included.
+EmeraldPing.tsx and emerald-ping.ts adapt NodeCard / useNodePingDisplay /
+PingChart into the MMWX API model: equal-height latency/loss color samples,
+carrier summaries and selectable historical charts. FleetSummary.tsx adapts
+NodeGeneralCards and NodeEarthGlobe with country-level SVG geography,
+reported region rates and currency-separated estimates; no fabricated links.
+The Nezha-derived base styles remain; emerald.css supplies the current theme.
+
+world-atlas 2.0.2
+Copyright 2013-2019 Michael Bostock
+Source: https://github.com/topojson/world-atlas
+License: ISC
+Full license: /licenses/world-atlas-ISC.txt
+The bundled countries-110m dataset is used only for a geographic illustration;
+it does not represent measured server coordinates.
+
+Nezha user frontend / nezha-dash
+Authors: hamster1963 and contributors; Nezha contributors.
+Source: https://github.com/nezhahq/user-frontend-backup
+Upstream frontend: https://github.com/hamster1963/nezha-dash-v2
+Pinned revision: 1dd038bea8f6c5143c3e8fb4077fead24994fe4e
+License: Apache License, Version 2.0
+Full license: /licenses/nezha-frontend-Apache-2.0.txt
+
+Modified for MMWX Probe: src/App.tsx and src/styles.css adapt the
+Header.tsx, ServerCard.tsx, ServerUsageBar.tsx and src/index.css visual
+structure and light/dark stone palette. The original Tailwind/router/API
+implementation was replaced with local CSS, accessible links and the MMWX
+probe/series/stream contract. Resource cards, filters and responsive details
+are adapted; the current aggregate statistics area is implemented separately
+in FleetSummary.tsx.
+
+This is an independent MMWX frontend, not an official Nezha product.
+No Nezha trademarks, logos or brand assets are used as this project's brand.
+The upstream snapshot contains no separate NOTICE file.
+
+The Apache-2.0 terms for the adapted portions remain applicable. The root
+LICENSE governs the existing MMWX code and does not replace this license.
