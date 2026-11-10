@@ -10,7 +10,7 @@ function normalizeTheme(value?: string): ThemeName {
   return theme && /^[A-Za-z0-9_-]{1,64}$/.test(theme) ? theme : "pixel";
 }
 
-export function applyAppearance(input?: ProbeAppearance) {
+export function applyAppearance(input?: ProbeAppearance, override?: ProbeColorMode) {
   const cached = (() => {
     try {
       return JSON.parse(
@@ -22,7 +22,7 @@ export function applyAppearance(input?: ProbeAppearance) {
   })();
   const appearance = input || cached || { theme: "pixel", color_mode: "light" };
   const theme = normalizeTheme(appearance.theme);
-  const colorMode = readColorModePreference(appearance.color_mode);
+  const colorMode = override ?? readColorModePreference(appearance.color_mode);
   const root = document.documentElement;
   for (const className of Array.from(root.classList)) {
     if (className.startsWith("theme-")) root.classList.remove(className);

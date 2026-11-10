@@ -8,10 +8,10 @@
 
 - 卡片和列表两种服务器视图
 - CPU、内存、硬盘、流量及实时网速
-- 延迟、丢包率及 1h/6h/24h 趋势图
+- CPU、内存、磁盘、网速与连接数的 1H / 6H / 12H / 24H 趋势图
 - WebSocket 实时更新，断线后自动回退到 HTTP 轮询
-- 基于 Nezha 默认前端的全新页面，支持浅色/深色及手机/桌面布局
-- 节点搜索、状态/地区筛选、独立详情页与系统资源/网速历史
+- 基于 Emerald 的 React 页面，支持浅色 / 深色 / 跟随系统及手机 / 桌面布局
+- 节点名称、地区和系统搜索，列表排序，独立详情页与图表悬停提示
 - Worker Secret 保护主控探针接口，浏览器无法读取访问密钥
 
 ## 工作方式
@@ -26,9 +26,34 @@ Worker 仅代理三个固定路径，不接受访客指定上游地址，因此�
 | --- | --- | --- |
 | `/api/probe` | `/api/public/probe-servers` | 服务器状态 |
 | `/api/series` | `/api/public/probe-series` | 24 小时延迟、丢包率及系统指标历史；追加 `metric=system` 获取 CPU、内存、网速和累计流量序列 |
+| `/api/stream` | `/api/public/probe-ws` | 实时 WebSocket |
 
 服务器列表中的每个 `servers[]` 对象还会返回当前计费周期的 `daily_traffic`，元素包含 `date`、`uplink`、`downlink` 和 `total`（字节）。周期汇总字段包括 `traffic_used_up`、`traffic_used_down`、`traffic_used_total`，周期边界为 `period_start`（含）和 `period_end`（不含）。兼容字段 `traffic_used` 仍表示按主控服务器统计模式计算的计费用量。
-| `/api/stream` | `/api/public/probe-ws` | 实时 WebSocket |
+
+### Emerald 展示约定
+
+视觉取值来自 `Tokinx/cf-server-monitor-theme-emerald` 的固定提交 `c80591198df4d2a0332b86b41e53e42fd341ed99`，对应 `CF-Server-Monitor` 提交 `612027cbdb248bc2df7e69f9d01b5cefb4d14fa8`。仅翻译前端，不接入对方后端、品牌、个人内容或访客定位服务。
+
+- `styles/main.css`：沿用前景色、灰度、字体和 `--radius: .625rem`；`rounded-md` 换算为 8px。
+- `Background.vue`：1300 × 400px 的 emerald-500 → lime-300 渐变、40% 透明度、顶部径向蒙版、72 × 56px 倾斜网格。
+- `Header.vue` / `NodeCard.vue`：1280px 最大宽度、16px 水平内边距、56px 导航、12px 卡片间距、300px 最小卡宽、60% 白底、12px 指标文字和 11px 辅助文字。
+- `InstanceDetail.vue` / `LoadChart.vue`：价格四卡、2 列信息区、3 列图表、192px 绘图区；采用原图表珊瑚红、青绿、天蓝和紫色。
+
+默认不渲染服务器总览（统计卡片及地球），也不渲染三网延迟、回程、丢包等区块；底层组件和数据契约保留。只提供 Emerald 一套外观；右上角切换浅色 → 深色 → 自动。管理入口保留本项目的 passkey 登录，不使用对方的管理地址。
+
+详情按 `src/types.ts` 和系统序列接入实际字段，缺失的格子直接隐藏：
+
+| 展示 | 本项目字段 / 规则 |
+| --- | --- |
+| 节点价格 | `renewal_price_cny` 优先；否则 `renewal_price` + `renewal_currency`，不请求外部汇率 |
+| 月均支出、剩余价值 | 根据已上报价格、`renewal_cycle`、`expires_at` 推导；月/季/半年/年/两年/三年按 30/90/180/365/730/1095 天折算，月均按 30 天；提示标明估算，非账单或退款额 |
+| 剩余时间 | `expires_at`；仅明确 `renewal_cycle=permanent` 才显示长期 |
+| 硬件 | `cpu_model`、`cpu_cores`、`cpu_threads`、`arch`、`kernel` |
+| 系统 | `os`、`uptime`；离线时才有 `last_seen`，不能用浏览器收包时间冒充在线节点最后上报时间 |
+| 存储 / 网络 | `mem_total`、`disk_total`、`traffic_used`（回退 `traffic_used_total`）、`traffic_limit`、`upload_speed`、`download_speed`；未设置限额不冒充无限流量 |
+| 系统历史 | `/api/series?metric=system` 的 `{t,value}` 序列：`cpu_pct`、`mem_used`、`disk_used`、`upload_speed`、`download_speed`、`tcp_connections`、`udp_connections` |
+
+GPU 型号/使用率、Swap 总量/历史、进程数/历史、精确启动时间、在线最后上报时间、历史 CPU 负载及任意分组/自定义标签未在当前契约中提供，不创建虚假值。12H 使用现有 `range=24h` 响应按采样时间裁取最近 12 小时，保留原 30 分钟采样粒度；其他范围使用原生接口，缺样保留断点。详情每 30 秒刷新，切换范围取消旧请求，10 秒超时并自动重试。
 
 ## 准备工作
 
@@ -122,17 +147,14 @@ npm run dev
 
 ### 无密钥模拟预览
 
-模拟服务只绑定本机，独立于 Worker，数据通过真实 HTTP/WebSocket 进入页面：
+使用独立的本地模拟服务，在 `127.0.0.1:8788` 提供符合上述契约的 `/api/probe`、`/api/series` 和 `/api/stream`（仓库不附带模拟后端）。然后启动：
 
 ```powershell
-# 终端 1
-node scripts/mock-probe.mjs
-# 终端 2
 $env:VITE_PROBE_MOCK='1'
 npm run dev
 ```
 
-模拟模式代理到 `127.0.0.1:8788`，页面明确标记模拟数据。正常开发不设置 `VITE_PROBE_MOCK`；模拟服务及其 `/__qa/*` 测试控制端点不会被打包进 Worker 或静态产物。页面按接口原始下标查询历史，筛选不改变服务器编号；缺失指标显示 `—`，缺失采样保留断点。
+模拟模式代理到 `127.0.0.1:8788`；仅在开发环境、模拟模式且 URL 带 `?debug` 时显示“演示环境”提示，生产构建不包含该提示。正常开发不设置 `VITE_PROBE_MOCK`；模拟服务及其 `/__qa` 测试控制端点不会被打包进 Worker 或静态产物。页面按接口原始下标查询历史，筛选和排序不改变服务器编号；缺失信息隐藏，单个指标缺项显示 `—`，缺失采样保留断点。
 
 WebSocket 收到有效帧时优先使用实时数据；断线后立即回退 HTTP（5 秒一次），以 1–30 秒指数退避重连。15 秒未收到有效帧也会关闭并重连，避免静默连接冻结页面；单次 HTTP 请求 10 秒超时。详情历史每 30 秒刷新，保留天数由主控决定。
 
