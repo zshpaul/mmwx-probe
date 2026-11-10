@@ -43,19 +43,6 @@ export type GlobeLabel = {
 };
 
 type Box = { x: number; y: number; w: number; h: number };
-export type GlobeViewport = { x: number; y: number; width: number; height: number };
-
-export function visibleGlobeViewport(globe: GlobeViewport, viewport: GlobeViewport): GlobeViewport {
-  const scale = 448 / Math.max(1, globe.width);
-  const left = Math.max(globe.x, viewport.x);
-  const top = Math.max(globe.y, viewport.y);
-  return {
-    x: (left - globe.x) * scale,
-    y: (top - globe.y) * scale,
-    width: Math.max(0, Math.min(globe.x + globe.width, viewport.x + viewport.width) - left) * scale,
-    height: Math.max(0, Math.min(globe.y + globe.height, viewport.y + viewport.height) - top) * scale,
-  };
-}
 
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -68,7 +55,6 @@ export function layoutGlobeLabels(
   points: GlobeLabelPoint[],
   m: GlobeLabelMetrics,
   sphere: { cx: number; cy: number; r: number },
-  viewport?: GlobeViewport,
 ): GlobeLabel[] {
   const dots: Array<Box & { code: string }> = points.map((p) => ({
     code: p.code,
@@ -103,7 +89,6 @@ export function layoutGlobeLabels(
     for (let i = 0; i < candidates.length; i++) {
       const [dx, dy] = candidates[i];
       const box = { x: p.x + dx, y: p.y + dy, w, h };
-      if (viewport && (box.x < viewport.x || box.y < viewport.y || box.x + w > viewport.x + viewport.width || box.y + h > viewport.y + viewport.height)) continue;
       const ccx = box.x + w / 2 - sphere.cx;
       const ccy = box.y + h / 2 - sphere.cy;
       if (Math.hypot(ccx, ccy) > sphere.r + h) continue;
