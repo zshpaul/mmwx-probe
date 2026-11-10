@@ -4,7 +4,8 @@ import type { ProbePayload, ProbeServer } from "./types";
 import { EmeraldPingSummary } from "./EmeraldPing";
 import { OsIcon, RegionFlag } from "./ServerSymbols";
 import { billableTraffic, trafficUsageLabel } from "./traffic-display";
-import { bytes, isNumber, percent, ratio, speed } from "./emerald-model";
+import { bytes, isNumber, nodeLocation, percent, ratio, speed } from "./emerald-model";
+import { loadAverageTitle } from "./telemetry-display";
 
 const columns = [
   { key: "status", label: "状态" }, { key: "os", label: "系统" }, { key: "name", label: "节点" },
@@ -41,13 +42,13 @@ export function ServerList({ nodes, tri, onPing }: { nodes: { server: ProbeServe
     {sorted.map(({ server, index }) => <div key={index} className={`server-row ${server.online ? "" : "offline"}`}>
       <span className="column-status" title={server.online ? "在线" : "离线"}><span className={`status-dot ${server.online ? "" : "down"}`} /></span>
       <span className="column-os"><OsIcon os={server.os} /></span>
-      <span className="column-name"><RegionFlag server={server} /><strong><a className="card-link" href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>{server.name || `节点 ${index + 1}`}</a></strong>{!server.online && <small className="negative">离线</small>}</span>
-      <Metric label="CPU" value={server.cpu_pct} title={server.loadavg} />
+      <span className="column-name"><RegionFlag server={server} /><strong><a className="card-link" href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>{server.name || `节点 ${index + 1}`}</a></strong>{nodeLocation(server) && <span className="node-city" title={nodeLocation(server)}>{nodeLocation(server)}</span>}{!server.online && <small className="negative">离线</small>}</span>
+      <Metric label="CPU" value={server.cpu_pct} title={loadAverageTitle(server.loadavg)} />
       <Metric label="内存" value={ratio(server.mem_used, server.mem_total)} title={`${bytes(server.mem_used)} / ${bytes(server.mem_total)}`} />
       <Metric label="硬盘" value={ratio(server.disk_used, server.disk_total)} title={`${bytes(server.disk_used)} / ${bytes(server.disk_total)}`} />
       <Metric label="流量" value={ratio(billableTraffic(server), server.traffic_limit)} title={`${trafficUsageLabel(server)}：${bytes(billableTraffic(server))}${server.traffic_limit ? ` / ${bytes(server.traffic_limit)}` : ""}`} />
       <span className="table-speed"><span className="upload"><ChevronUp size={12} />{speed(server.upload_speed)}</span><span className="download"><ChevronDown size={12} />{speed(server.download_speed)}</span></span>
-      <button className="table-ping" aria-label={`${server.name || "节点"} 三网延迟`} onClick={() => onPing(index)}><EmeraldPingSummary server={server} tri={tri} onOpen={() => onPing(index)} compact /></button>
+      <button className="table-ping" aria-label={`${server.name || "节点"} 三网延迟`} onClick={() => onPing(index)}><EmeraldPingSummary server={server} index={index} tri={tri} onOpen={() => onPing(index)} compact /></button>
     </div>)}
   </div>;
 }

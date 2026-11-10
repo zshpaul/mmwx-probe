@@ -9,7 +9,11 @@ for (const range of ["1h", "6h", "12h", "24h"]) {
   }
   const response = series(new URL(`http://localhost/api/series?server=0&range=${range}&all=1`));
   assert.equal(response.all_series.length, 3);
-  assert.equal(response.all_series[0].buckets.length, response.buckets);
+  assert.equal(Object.hasOwn(response, "buckets"), false);
+  assert.equal(response.all_series[0].buckets.length, response.series.buckets.length);
+  assert.equal(response.all_series[0].isp, "telecom");
+  if (range === "1h") assert.equal(response.series.buckets.length, 12);
+  if (range === "24h") assert.equal(response.series.buckets.length, 48);
   const system = series(new URL(`http://localhost/api/series?server=0&range=${range}&metric=system&all=1`));
   assert.equal(Object.hasOwn(system, "all_series"), false);
   assert.ok(Array.isArray(system.series.cpu_pct));

@@ -82,16 +82,16 @@ export function series(url) {
     },
   };
   const targets = ["电信 · 上海", "联通 · 北京", "移动 · 广州"].map((label, line) => ({
-      key: `target-${line}`, label, current_ms: 34 + line * 12, loss_pct: 0,
+      key: `target-${line}`, label, isp: ["telecom", "unicom", "mobile"][line], current_ms: 34 + line * 12, loss_pct: 0,
       buckets: Array.from({ length: count }, (_, index) => ({
         ms: 28 + line * 17 + Math.sin(index * 0.6 + line) * 6 + (index % 3) * 3,
         loss: index % 9 === line + 3 ? 2.5 + line : 0,
       })),
     }));
   return {
-    ...meta,
+    success: true, generated_at: end, bucket_sec: bucket,
     series: {
-      label: "平均", current_ms: targets.reduce((total, target) => total + target.current_ms, 0) / targets.length, loss_pct: 0,
+      key: "__avg__", label: "平均", current_ms: targets.reduce((total, target) => total + target.current_ms, 0) / targets.length, loss_pct: 0,
       buckets: Array.from({ length: count }, (_, index) => ({
         ms: targets.reduce((total, target) => total + target.buckets[index].ms, 0) / targets.length,
         loss: targets.reduce((total, target) => total + target.buckets[index].loss, 0) / targets.length,

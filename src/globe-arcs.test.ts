@@ -24,8 +24,20 @@ const JP: [number, number] = [138.25, 36.2];
 const US: [number, number] = [-98.5, 39.8];
 const dist = (x: number, y: number) => Math.hypot(x - 320, y - 190);
 
-ok(arcAltitude(HK, US) > arcAltitude(HK, JP), "越远应抬得越高");
-ok(arcAltitude([0, 0], [180, 0]) <= 0.34 + 1e-9, "最高不超过半径的 0.34");
+ok(arcAltitude(HK, US) < arcAltitude(HK, JP), "COBE 的长弧不会额外放大高度");
+ok(arcAltitude(HK, JP) <= .25, "0.4 控制点高度对应的径向增高不超过半径25%");
+for (const endpoint of [JP, US, [180, 0] as [number, number]]) {
+  ok(sampleArc(projection(), HK, endpoint).every(point => dist(point.x, point.y) <= 168 * 1.25 + 1e-6), "所有弧点投影都受1.25R上界约束");
+}
+{
+  const limb = geoOrthographic().translate([0, 0]).scale(100).rotate([0, 0]);
+  const points = sampleArc(limb, [80, 0], [100, 0]);
+  const expected = (.5 * Math.cos(10 * Math.PI / 180) + .75) * 100;
+  ok(Math.abs(points[32].x - expected) < 1e-8, "Bézier弧顶等于COBE的0.25端点和+0.5控制点");
+  ok(Math.abs(points[32].x - 140) > 15, "不能再把arcHeight当作40%的正弦抬升");
+}
+ok(sampleArc(projection(), US, US, 64, .4).length === 0, "Coincident coordinates must not produce a radial spike");
+ok(sampleArc(projection(), HK, HK, 64, .4).length === 0, "Front-facing coincident coordinates must also be omitted");
 
 {
   const p = projection();

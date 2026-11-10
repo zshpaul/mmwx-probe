@@ -11,7 +11,8 @@ import { ServerDetails } from "./ServerDetails";
 import { ServerList } from "./ServerList";
 import { OsIcon, RegionFlag } from "./ServerSymbols";
 import { billableTraffic, trafficUsageLabel } from "./traffic-display";
-import { bytes, isNumber, locationName, percent, priceCards, ratio, speed, uptime } from "./emerald-model";
+import { bytes, isNumber, locationName, nodeLocation, percent, priceCards, ratio, speed, uptime } from "./emerald-model";
+import { loadAverage } from "./telemetry-display";
 
 export const designAttribution = "Emerald React adaptation for MMWX Probe; see /THIRD_PARTY_NOTICES.txt.";
 function Usage({ label, value, quantity, title }: { label: string; value?: number; quantity?: string; title?: string }) {
@@ -23,9 +24,9 @@ export function ServerCard({ server, index, now, tri, onPing }: { server: ProbeS
   const price = prices.find(card => card.label === "节点价格");
   const remaining = prices.find(card => card.label === "剩余时间");
   return <article className={`server-card ${server.online ? "" : "offline"}`}>
-    <div className="server-identity"><span className={`status-dot ${server.online ? "" : "down"}`} /><h2><a className="card-link" href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>{server.name || `节点 ${index + 1}`}</a></h2><span className="server-icons"><OsIcon os={server.os} /><RegionFlag server={server} /></span></div>
+    <div className="server-identity"><span className={`status-dot ${server.online ? "" : "down"}`} /><h2><a className="card-link" href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>{server.name || `节点 ${index + 1}`}</a>{nodeLocation(server) && <span className="node-city" title={nodeLocation(server)}>{nodeLocation(server)}</span>}</h2><span className="server-icons"><OsIcon os={server.os} /><RegionFlag server={server} /></span></div>
     <div className="resource-grid">
-      {isNumber(server.cpu_pct) && <Usage label="CPU" value={server.cpu_pct} quantity={server.loadavg} />}
+      {isNumber(server.cpu_pct) && <Usage label="CPU" value={server.cpu_pct} quantity={loadAverage(server.loadavg)} title={server.loadavg} />}
       {(isNumber(server.mem_used) || isNumber(server.mem_total)) && <Usage label="内存" value={ratio(server.mem_used, server.mem_total)} quantity={`${bytes(server.mem_used)} / ${bytes(server.mem_total)}`} />}
       {(isNumber(server.disk_used) || isNumber(server.disk_total)) && <Usage label="硬盘" value={ratio(server.disk_used, server.disk_total)} quantity={`${bytes(server.disk_used)} / ${bytes(server.disk_total)}`} />}
       {isNumber(traffic) && <Usage label="流量" value={ratio(traffic, server.traffic_limit)} quantity={`${bytes(traffic)}${isNumber(server.traffic_limit) && server.traffic_limit > 0 ? ` / ${bytes(server.traffic_limit)}` : ""}`} title={trafficUsageLabel(server)} />}
@@ -35,8 +36,8 @@ export function ServerCard({ server, index, now, tri, onPing }: { server: ProbeS
       <div className={server.online ? "" : "stale-facts"}>
         {(isNumber(server.upload_speed) || isNumber(server.download_speed)) && <div className="fact-row"><span>速率</span><i /><span className="speed-pair"><span className="upload"><ChevronUp size={12} />{speed(server.upload_speed)}</span><span className="download"><ChevronDown size={12} />{speed(server.download_speed)}</span></span></div>}
         {isNumber(server.uptime) && <div className="fact-row"><span>在线</span><i /><span>{uptime(server.uptime)}</span></div>}
-        {(price || remaining) && <div className="fact-row"><span>费用</span><i /><span title={remaining?.title}>{price && `${price.value} ${price.unit}`}{price && remaining && " · "}{remaining && <span className={remaining.tone}>{remaining.value}{remaining.unit && ` ${remaining.unit}`}</span>}</span></div>}
-        <EmeraldPingSummary server={server} tri={tri} onOpen={onPing} />
+        {(price || remaining) && <div className="fact-row"><span>费用</span><i /><span title={remaining?.title}>{price && `${price.value}${price.unit ? ` ${price.unit}` : ""}`}{price && remaining && " · "}{remaining && <span className={remaining.tone}>{remaining.value}{remaining.unit && ` ${remaining.unit}`}</span>}</span></div>}
+        <EmeraldPingSummary server={server} index={index} tri={tri} onOpen={onPing} />
       </div>
     </div>
   </article>;

@@ -18,7 +18,7 @@ assert.equal(bytes(1024 ** 2), "1.0 MB");
 assert.equal(bytes(1000 * 1024 ** 3), "1000.0 GB");
 const prices = priceCards({ online: true, renewal_price_cny: 365, renewal_cycle: "year", expires_at: "2026-11-20T00:00:00Z" }, now);
 assert.deepEqual(prices.map(card => card.value), ["¥365.00", "¥30.00", "10", "¥10.00"]);
-assert.equal(priceCards({ online: true, renewal_price_cny: 0, renewal_cycle: "month" }, now)[0].value, "¥0.00");
+assert.equal(priceCards({ online: true, renewal_price_cny: 0, renewal_cycle: "month" }, now)[0].value, "免费");
 assert.equal(priceCards({ online: true, renewal_price_cny: 10, renewal_cycle: "permanent" }, now).length, 2);
 assert.equal(priceCards({ online: true, expires_at: "invalid" }, now).length, 0);
 assert.equal(priceCards({ online: true, expires_at: "2026-01-01" }, now)[0].value, "已到期");
