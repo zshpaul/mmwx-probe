@@ -18,7 +18,7 @@ export function EmeraldPingSummary({ server, index = 0, tri, onOpen, compact = f
   server: ProbeServer; index?: number; tri?: ProbePayload["tri_isp"]; onOpen: () => void; compact?: boolean;
 }) {
   const rows = triISPRows(tri, server.ping || []);
-  const { data, loading, error } = usePingHistory(index);
+  const { data, loading, error } = usePingHistory(index, server, "1h", !compact);
   const stats = pingSummary(data?.all_series || [], data);
   return <div className={`emerald-ping${compact ? " compact" : ""}`}>
     <div className="fact-row"><span>三网</span><i /><span className="carrier-values">{(rows.length ? rows : ["电信", "联通", "移动"].map(label => ({ label, series: undefined }))).slice(0, 3).map((row, index) => {
@@ -42,7 +42,7 @@ export function EmeraldPingSummary({ server, index = 0, tri, onOpen, compact = f
 }
 export function PingHistory({ server, index, showRoutes = false }: { server: ProbeServer; index: number; showRoutes?: boolean }) {
   const [range, setRange] = useState<DetailRange>("1h");
-  const { data: response, error, loading } = usePingHistory(index, range);
+  const { data: response, error, loading } = usePingHistory(index, server, range);
   const [hidden, setHidden] = useState<string[]>([]);
   const [delay, setDelay] = useState(true);
   const [loss, setLoss] = useState(true);
