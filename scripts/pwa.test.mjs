@@ -22,8 +22,12 @@ for (const icon of manifest.icons) {
   assert.equal(`${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`, icon.sizes);
   assert.equal(icon.type, "image/png");
   assert.ok(shell.includes(icon.src));
+  assert.equal(icon.purpose, icon.src.includes("maskable") ? "maskable" : "any");
 }
 const html = await readFile(new URL("index.html", root), "utf8");
 for (const name of ["application-name", "apple-mobile-web-app-title"]) {
   assert.ok(html.includes(`name="${name}" content="ZSH"`));
+}
+for (const size of [192, 512]) {
+  assert.ok(html.includes(`rel="icon" type="image/png" sizes="${size}x${size}" href="/icons/icon-${size}.png"`));
 }

@@ -27,6 +27,15 @@ NodeGeneralCards and NodeEarthGlobe with country-level SVG geography,
 reported region rates and currency-separated estimates; no fabricated links.
 The Nezha-derived base styles remain; emerald.css supplies the current theme.
 
+COBE 2.0.1
+Copyright (c) 2021 Shu Ding
+Source: https://github.com/shuding/cobe
+Pinned revision: 4fc247f673fbec28d5ae6d4798757e2bca83ed3b
+License: MIT
+Full copyright and license: /licenses/cobe-MIT.txt
+globe-arcs.ts adapts the quadratic Bezier geometry and back-side occlusion
+from src/arc.glslx to the existing SVG orthographic projection.
+
 world-atlas 2.0.2
 Copyright 2013-2019 Michael Bostock
 Source: https://github.com/topojson/world-atlas

@@ -1,58 +1,59 @@
 import { geoDistance, geoInterpolate, type GeoProjection } from "d3-geo";
 
-// 与主仓内置探针的 src/lib/globe-arcs.ts 同一套几何,改一边记得同步另一边。
-//
-// 探针地球上地区之间的 3D 弧线:沿大圆走、中段抬离地表,越远抬得越高(长弧会伸出地球轮廓),
-// 绕到背面被地球挡住的那段不画。
-
 interface ArcPoint {
   x: number;
   y: number;
   visible: boolean;
 }
 
-/** 弧顶离地高度,按地球半径的比例:两地越远越高,对跖点最高约 0.34。 */
+/** COBE 2.0.1 二次 Bézier 的最大径向高度，以球半径为单位。 */
 export function arcAltitude(
   from: [number, number],
   to: [number, number],
+  height = .4,
 ): number {
-  return 0.06 + 0.28 * (geoDistance(from, to) / Math.PI);
+  return Math.max(0, .5 * Math.cos(geoDistance(from, to) / 2) + .5 * (1 + height / .8) - 1);
 }
 
 /**
- * 沿大圆取 segments+1 个点,按 sin(πt) 抬离地表后投到屏幕上。
- *
- * 正射投影是线性的:离地心 r 倍远的点,屏幕位置就是地表点相对球心的偏移乘 r ——
- * 所以不用自己做三维旋转,地表点直接交给 projection(它不裁背面)算,再按高度放大偏移。
- * 被挡住 = 在背面半球,且投影落在地球圆盘之内;抬高后伸出轮廓的背面部分仍然看得见。
+ * COBE 的球半径为 0.8，控制点半径为 0.8 + height；高度不是曲线本身的离地距离。
+ * 正射投影线性，因此投影端点和控制点后做 Bézier 与三维采样结果相同。
+ * 背面且在球盘内的点不可见，与 COBE fragment 的丢弃规则一致。
  */
 export function sampleArc(
   projection: GeoProjection,
   from: [number, number],
   to: [number, number],
   segments = 64,
-  altitude = arcAltitude(from, to),
+  height = .4,
 ): ArcPoint[] {
   if (geoDistance(from, to) < 1e-8) return [];
   const [cx, cy] = projection.translate();
   const radius = projection.scale();
   const center = projection.invert?.([cx, cy]);
   if (!center) return [];
-  const interpolate = geoInterpolate(from, to);
+  const midpoint: [number, number] = 2 * Math.cos(geoDistance(from, to) / 2) > .001 ? geoInterpolate(from, to)(.5) : [0, 90];
+  const controlRadius = 1 + height / .8;
+  const controls = [from, midpoint, to].map((coordinate, index) => {
+    const projected = projection(coordinate)!;
+    const scale = index === 1 ? controlRadius : 1;
+    return {
+      x: (projected[0] - cx) * scale,
+      y: (projected[1] - cy) * scale,
+      depth: Math.cos(geoDistance(coordinate, center)) * scale,
+    };
+  });
   const points: ArcPoint[] = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const surface = interpolate(t);
-    const projected = projection(surface);
-    if (!projected) continue;
-    const lift = 1 + altitude * Math.sin(Math.PI * t);
-    const dx = (projected[0] - cx) * lift;
-    const dy = (projected[1] - cy) * lift;
-    const front = geoDistance(surface, center) <= Math.PI / 2;
+    const weights = [(1 - t) ** 2, 2 * (1 - t) * t, t ** 2];
+    const dx = controls.reduce((sum, point, index) => sum + weights[index] * point.x, 0);
+    const dy = controls.reduce((sum, point, index) => sum + weights[index] * point.y, 0);
+    const depth = controls.reduce((sum, point, index) => sum + weights[index] * point.depth, 0);
     points.push({
       x: cx + dx,
       y: cy + dy,
-      visible: front || dx * dx + dy * dy > radius * radius,
+      visible: depth >= 0 || dx * dx + dy * dy >= radius * radius,
     });
   }
   return points;

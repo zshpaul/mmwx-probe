@@ -232,6 +232,8 @@ git push -u origin main
 
 地球自动旋转以 Emerald 每帧 `0.002` 弧度为基准按 60Hz 换算，拖动、后台页面及 `prefers-reduced-motion: reduce` 时暂停；键盘方向键旋转及可见焦点仍可用。
 
+弧线按 Emerald 锁定的 COBE 2.0.1 二次 Bézier 公式生成：COBE 球半径为 0.8，`arcHeight=0.4` 指控制点增加的世界坐标半径，不是曲线本身抬高 40%。零节点高度下，曲线最大径向高度不超过球半径的 25%；长距离不额外放大。背面且投影位于球盘内的曲线隐藏。
+
 ## 许可证
 
 当前页面设计适配自 Emerald（MIT），固定版本见“Emerald 展示约定”。保留的基础样式曾适配自 Nezha 默认前端 `nezhahq/user-frontend-backup`（源自 `hamster1963/nezha-dash-v2`），固定提交 `1dd038bea8f6c5143c3e8fb4077fead24994fe4e`，Apache-2.0。全部署名与改动说明见 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)，完整许可随静态产物一起分发。未使用其商标 logo。
