@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowUp, ChevronDown, ChevronUp, LayoutGrid, Monitor, Moon, Search, Server, Sun, Table2 } from "lucide-react";
-import { PasskeyLogin } from "./PasskeyLogin";
 import { useProbe, applyAppearance, saveColorModePreference, readColorModePreference } from "./use-probe";
 import { nextColorMode } from "./theme-preference";
 import type { ProbePayload, ProbeServer } from "./types";
@@ -70,7 +69,7 @@ export function App() {
   const visible = servers.map((server, index) => ({ server, index })).filter(({ server }) => `${server.name || ""} ${locationName(server)} ${server.os || ""}`.toLowerCase().includes(search.toLowerCase()));
   const modeName = { light: "浅色主题", dark: "深色主题", system: "自动主题" }[mode];
   return <><Background /><div className="shell">
-    <header className={`topbar ${scrolled ? "scrolled" : ""}`}><a className="brand" href="#"><Server size={28} /><span>MMWX Probe</span></a><nav aria-label="页面工具"><button className="icon-button theme-button" title={`${modeName} · 点击切换`} aria-label={`${modeName}，切换主题`} onClick={() => { const next = nextColorMode(mode); setMode(next); saveColorModePreference(next); applyAppearance(data?.appearance, next); }}>{mode === "system" ? <Monitor size={18} /> : mode === "light" ? <Sun size={18} /> : <Moon size={18} />}</button><PasskeyLogin /></nav></header>
+    <header className={`topbar ${scrolled ? "scrolled" : ""}`}><a className="brand" href="#"><Server size={28} /><span>ZSH</span></a><nav aria-label="页面工具"><button className="icon-button theme-button" title={`${modeName} · 点击切换`} aria-label={`${modeName}，切换主题`} onClick={() => { const next = nextColorMode(mode); setMode(next); saveColorModePreference(next); applyAppearance(data?.appearance, next); }}>{mode === "system" ? <Monitor size={18} /> : mode === "light" ? <Sun size={18} /> : <Moon size={18} />}</button></nav></header>
     {import.meta.env.DEV && import.meta.env.VITE_PROBE_MOCK === "1" && new URLSearchParams(location.search).has("debug") && <div className="demo-note">演示环境 · 以下为模拟节点与趋势数据</div>}
     {error && <div className="notice error" role="alert">无法更新探针数据（{error}）。{data ? "当前保留最后一次快照，正在自动重试。" : "正在自动重试，请检查服务连接。"}</div>}
     {!data ? <main className="empty"><Activity size={28} /><h1>{error ? "暂时无法连接" : "正在连接探针…"}</h1></main> : !data.enabled ? <main className="empty"><h1>探针尚未启用</h1><p>请在主控中开启公开探针。</p></main> : selected !== undefined ? servers[selected] ? <ServerDetails key={selected} server={servers[selected]} index={selected} updatedAt={updatedAt} /> : <main className="empty"><h1>节点不存在或已移除</h1><a href="#">返回节点列表</a></main> : <main className="home">

@@ -88,7 +88,7 @@ export function useProbe(): { data?: ProbePayload; error?: string; connection: "
       setData(payload);
       setError(undefined);
       setUpdatedAt(Date.now());
-      document.title = "MMWX Probe";
+      document.title = "ZSH";
     };
     const poll = async () => {
       if (stopped || pending || (lastFrame && Date.now() - lastFrame < 12000)) return;
@@ -141,7 +141,7 @@ export function useProbe(): { data?: ProbePayload; error?: string; connection: "
       } catch { reconnect(); }
     };
     applyAppearance();
-    document.title = "MMWX Probe";
+    document.title = "ZSH";
     void poll();
     connect();
     const timer = window.setInterval(() => {

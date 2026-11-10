@@ -70,14 +70,14 @@ function Globe({ servers }: { servers: ProbeServer[] }) {
       onPointerDown={event => { dragging.current = true; position.current = [event.clientX, event.clientY]; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={event => { if (!dragging.current) return; const previous = position.current; position.current = [event.clientX, event.clientY]; setRotation(([longitude, latitude]) => [longitude + (event.clientX - previous[0]) / 2, Math.max(-65, Math.min(65, latitude - (event.clientY - previous[1]) / 3))]); }}
       onPointerUp={event => { dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={() => { dragging.current = false; }}>
-      <defs><radialGradient id={`${identifier}-sphere`} cx="40%" cy="35%"><stop stopColor="var(--globe-center)" /><stop offset=".83" stopColor="var(--globe-edge)" /><stop offset="1" stopColor="var(--globe-rim)" /></radialGradient></defs>
+      <defs><radialGradient id={`${identifier}-sphere`} cx="40%" cy="35%"><stop stopColor="var(--globe-center)" /><stop offset=".83" stopColor="var(--globe-edge)" /><stop offset="1" stopColor="var(--globe-rim)" /></radialGradient><clipPath id={`${identifier}-labels`}><rect width="448" height="250" /></clipPath></defs>
       <circle cx="224" cy="224" r="176" fill={`url(#${identifier}-sphere)`} className="globe-sphere" />
       <path d={path} stroke="var(--globe-ink)" strokeWidth="1.5" strokeLinecap="round" />
-      {visible.map(cluster => {
+      <g className="globe-labels" clipPath={`url(#${identifier}-labels)`}>{visible.map(cluster => {
         const onlineNodes = cluster.nodes.filter(server => server.online);
         const label = labels.find(label => label.code === cluster.code);
         return <g key={cluster.code}><title>{`${cluster.nodes[0].region_name || cluster.code} · ${cluster.nodes.length} 台；国家级示意位置`}</title><circle cx={cluster.x} cy={cluster.y} r="3" fill={onlineNodes.length ? "#059669" : "#d97706"} />{label && <foreignObject x={label.x} y={label.y} width={label.width} height={label.height}><div className="globe-rate" title="在线节点已上报速率合计"><span className="upload">⌃ {speed(sum(onlineNodes.map(server => server.upload_speed)))}</span><span className="download">⌄ {speed(sum(onlineNodes.map(server => server.download_speed)))}</span></div><RegionFlag server={cluster.nodes[0]} /></foreignObject>}</g>;
-      })}
+      })}</g>
     </svg>
     <div className="fleet-status" title={`${online} 在线 · ${servers.length - online} 离线`}><span className="positive">● {online}</span><span className="warning">● {servers.length - online}</span></div>
   </div>;
