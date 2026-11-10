@@ -1,6 +1,7 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const palette = ["#3b82f6", "#10b981", "#f59e0b", "#a78bfa", "#ec4899", "#06b6d4"];
+const resourcePalette = ["var(--blue)", "var(--purple)", "var(--orange)"];
+const signalPalette = ["var(--lime)", "var(--green)", "var(--purple)", "var(--orange)", "var(--blue)"];
 const timeLabel = (time: number) => new Date(time * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
 const fullTime = (time: number) => new Date(time * 1000).toLocaleString("zh-CN", { hour12: false });
 
@@ -14,6 +15,7 @@ export default function Trend({ title, unit, rows, lines, loading, error, domain
   domain?: [number, number];
 }) {
   const hasValues = rows.some(row => lines.some(line => row[line.key] !== null && row[line.key] !== undefined));
+  const palette = lines.some(line => line.key === "cpu") ? resourcePalette : signalPalette;
   return <section className="chart-panel">
     <div className="chart-heading"><h3>{title}</h3><span>{unit}</span></div>
     <div className="legend">{lines.map((line, index) => <span key={line.key}><i style={{ background: palette[index % palette.length] }} />{line.name}</span>)}</div>
