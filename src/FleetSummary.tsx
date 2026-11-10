@@ -11,7 +11,7 @@ import { financeSummary, speed } from "./emerald-model";
 import { RegionFlag } from "./ServerSymbols";
 import { layoutGlobeLabels } from "./globe-labels";
 import { arcPath, sampleArc } from "./globe-arcs";
-import { globeRotationStep } from "./globe-motion";
+import { advanceGlobeLongitude, globeRotationStep } from "./globe-motion";
 
 const world = atlas as unknown as Topology;
 const land = feature(world, world.objects.land);
@@ -43,26 +43,31 @@ function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visito
   const projection = geoOrthographic().rotate(rotation).scale(174).translate([224, 224]);
   const center: [number, number] = [-rotation[0], -rotation[1]];
   useEffect(() => {
-    const preference = matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let previous: number | undefined;
     const animate = (time: number) => {
-      const step = globeRotationStep(previous === undefined ? 0 : time - previous, dragging.current, preference.matches, document.visibilityState === "visible");
+      const step = globeRotationStep(previous === undefined ? 0 : time - previous, dragging.current, document.visibilityState === "visible");
       previous = time;
-      if (step) setRotation(([longitude, latitude]) => [(longitude - step) % 360, latitude]);
+      if (step) setRotation(([longitude, latitude]) => [advanceGlobeLongitude(longitude, step), latitude]);
       frame = requestAnimationFrame(animate);
     };
     const sync = () => {
+      dragging.current = false;
       cancelAnimationFrame(frame);
       previous = undefined;
-      if (!preference.matches && document.visibilityState === "visible") frame = requestAnimationFrame(animate);
+      if (document.visibilityState === "visible") frame = requestAnimationFrame(animate);
     };
-    preference.addEventListener("change", sync);
+    const release = () => { dragging.current = false; };
+    window.addEventListener("blur", release);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
     document.addEventListener("visibilitychange", sync);
     sync();
     return () => {
       cancelAnimationFrame(frame);
-      preference.removeEventListener("change", sync);
+      window.removeEventListener("blur", release);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
       document.removeEventListener("visibilitychange", sync);
     };
   }, []);
