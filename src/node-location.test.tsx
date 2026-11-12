@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { financeSummary, nodeLocation, priceCards } from "./emerald-model";
+import { financeSummary, locationName, nodeLocation, priceCards } from "./emerald-model";
 import { ServerCard } from "./App";
 import { ServerList } from "./ServerList";
 import { ServerDetails } from "./ServerDetails";
@@ -19,6 +19,24 @@ equal(nodeLocation({ online: true, region_city: "广州" }), "广州");
 equal(nodeLocation({ online: true, region_city: " osaka " }), "大阪");
 equal(nodeLocation({ online: true }), "");
 equal(nodeLocation({ online: true, region_city: "Unknown", region_name: "未知", region: "—" }), "");
+for (const city of ["Frankfurt", " frankfurt ", "FRANKFURT AM MAIN", " Frankfurt  am\tMain ", "法兰克福"]) {
+  const frankfurt = { online: true, name: "Frankfurt · EU", region_city: city, region_country: "DE" };
+  equal(nodeLocation(frankfurt), "法兰克福");
+  equal(locationName(frankfurt), "DE · 法兰克福");
+  for (const markup of [
+    renderToStaticMarkup(<ServerCard server={frankfurt} index={0} now={0} onPing={() => {}} />),
+    renderToStaticMarkup(<ServerList nodes={[{ server: frankfurt, index: 0 }]} onPing={() => {}} />),
+    renderToStaticMarkup(<ServerDetails server={frankfurt} index={0} updatedAt={0} />),
+  ]) {
+    equal(markup.includes('class="node-city" title="法兰克福">法兰克福</span>'), true);
+    equal(markup.includes("Frankfurt · EU"), true);
+    equal(markup.includes('title="DE · 法兰克福"'), true);
+  }
+}
+equal(nodeLocation({ online: true, region_name: " Frankfurt am Main " }), "法兰克福");
+equal(nodeLocation({ online: true, region: "FRANKFURT" }), "法兰克福");
+equal(nodeLocation({ online: true, region_city: "Frankfurt Airport" }), "Frankfurt Airport");
+equal(locationName({ online: true, region_name: "Frankfurt Airport" }), "Frankfurt Airport");
 const server = { online: true, name: "Example", region_city: "San Jose", cpu_pct: 5, loadavg: "1.64 1.39 1.20 4/278 41234" };
 const card = renderToStaticMarkup(<ServerCard server={server} index={0} now={0} onPing={() => {}} />);
 equal(card.includes('class="node-city" title="圣何塞">圣何塞</span>'), true);

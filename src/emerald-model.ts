@@ -2,6 +2,7 @@ import type { ProbeServer } from "./types";
 import type { ProbeMetricPoint } from "./conn-sparkline";
 import { probeRangeBucketCount, probeRangeBucketSec } from "./probe-ranges";
 import { resourceHistoryFromSeries, type ResourceSeriesInput } from "./resource-history";
+import { cityDisplay, frankfurtDisplay } from "./location-display";
 
 export const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 export const ratio = (used?: number, total?: number) => isNumber(used) && isNumber(total) && total > 0 ? Math.min(100, Math.max(0, used / total * 100)) : undefined;
@@ -14,16 +15,10 @@ export function bytes(value?: number, base = 1024) {
   return `${amount.toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
 }
 export const speed = (value?: number) => isNumber(value) ? `${bytes(value)}/s` : "—";
-export const locationName = (server: ProbeServer) => [server.region_name || server.region || server.region_country, server.region_city].filter(Boolean).join(" · ");
-const cityNames: Record<string, string> = {
-  "los angeles": "洛杉矶", "san jose": "圣何塞", osaka: "大阪", tokyo: "东京",
-  "hong kong": "香港", singapore: "新加坡", guangzhou: "广州", shanghai: "上海",
-  beijing: "北京", seoul: "首尔", london: "伦敦", frankfurt: "法兰克福",
-  amsterdam: "阿姆斯特丹", sydney: "悉尼", "new york": "纽约", seattle: "西雅图",
-};
+export const locationName = (server: ProbeServer) => [server.region_name || server.region || server.region_country, server.region_city].filter((value): value is string => !!value).map(frankfurtDisplay).join(" · ");
 export function nodeLocation(server: ProbeServer): string {
   const location = [server.region_city, server.region_name, server.region].find(value => value?.trim() && !/^(unknown|未知|[-—]+)$/i.test(value.trim()))?.trim() || "";
-  return cityNames[location.toLowerCase()] || location;
+  return cityDisplay(location);
 }
 export function uptime(value?: number) {
   if (!isNumber(value) || value < 0) return undefined;

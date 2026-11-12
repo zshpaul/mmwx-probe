@@ -27,3 +27,5 @@ const sameCountry = renderToStaticMarkup(<FleetSummary servers={[...globeServers
 check((sameCountry.match(/节点国家至访客国家的示意连线/g) || []).length === 2, "Same-country nodes must not create a degenerate arc");
 const onlySameCountry = renderToStaticMarkup(<FleetSummary servers={[{ online: true, region_country: "US" }]} formatBytes={String} visitorCountryCode="US" />);
 check(!onlySameCountry.includes("节点国家至访客国家的示意连线"), "Only same-country nodes means no arcs");
+const frankfurtGlobe = renderToStaticMarkup(<FleetSummary servers={[{ online: true, region_country: "DE", region_name: " Frankfurt am Main " }]} formatBytes={String} />);
+check(frankfurtGlobe.includes("法兰克福 · 1 台；国家级示意位置"), "Globe title translates Frankfurt region");

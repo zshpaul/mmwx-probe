@@ -1,3 +1,5 @@
+import { cityDisplay } from "./location-display";
+
 export interface VisitorData {
   countryCode: string;
   city: string;
@@ -20,5 +22,5 @@ export function visitorLocation(visitor?: VisitorData): string {
   if (/^[A-Z]{2}$/.test(visitor.countryCode)) {
     country = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" }).of(visitor.countryCode) || "";
   }
-  return [country, visitor.city || visitor.region].filter(Boolean).join(" · ") || "网络访客";
+  return [country, cityDisplay(visitor.city || visitor.region)].filter(Boolean).join(" · ") || "网络访客";
 }
