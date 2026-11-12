@@ -20,7 +20,12 @@ check(visitorBrowser("Mozilla Chrome/130 Safari/537 Edg/130") === "Edge", "Edge 
 check(visitorBrowser("Mozilla Safari/605") === "Safari", "Safari");
 check(visitorBrowser("") === "未知浏览器", "Unknown UA");
 check(visitorLocation() === "网络访客", "Missing location fallback");
-check(visitorLocation({ countryCode: "US", city: "Los Angeles", region: "", maskedIp: "" }) === "United States · Los Angeles", "Country name and city");
+check(visitorLocation({ countryCode: "US", city: "Los Angeles", region: "", maskedIp: "" }) === "United States · 洛杉矶", "Country name and mapped city");
+for (const city of ["Frankfurt", " frankfurt ", "FRANKFURT AM MAIN", " Frankfurt  am\tMain ", "法兰克福"]) {
+  check(visitorLocation({ countryCode: "DE", city, region: "", maskedIp: "" }) === "Germany · 法兰克福", `Visitor city: ${city}`);
+}
+check(visitorLocation({ countryCode: "DE", city: "", region: " Frankfurt am Main ", maskedIp: "" }) === "Germany · 法兰克福", "Visitor region fallback");
+check(visitorLocation({ countryCode: "DE", city: "Frankfurt Airport", region: "", maskedIp: "" }) === "Germany · Frankfurt Airport", "Do not translate partial matches");
 
 async function verify() {
   const request = new Request("https://probe.example/api/visitor", { headers: { "CF-Connecting-IP": "207.57.123.91" } });

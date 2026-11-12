@@ -12,6 +12,7 @@ import { RegionFlag } from "./ServerSymbols";
 import { layoutGlobeLabels } from "./globe-labels";
 import { arcPath, sampleArc } from "./globe-arcs";
 import { advanceGlobeLongitude, globeRotationStep } from "./globe-motion";
+import { frankfurtDisplay } from "./location-display";
 
 const world = atlas as unknown as Topology;
 const land = feature(world, world.objects.land);
@@ -108,7 +109,7 @@ function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visito
       <g className="globe-labels" clipPath={`url(#${identifier}-labels)`}>{visible.map(cluster => {
         const onlineNodes = cluster.nodes.filter(server => server.online);
         const label = labels.find(label => label.code === cluster.code);
-        return <g key={cluster.code}><title>{`${cluster.nodes[0].region_name || cluster.code} · ${cluster.nodes.length} 台；国家级示意位置`}</title><circle cx={cluster.x} cy={cluster.y} r="3" fill={onlineNodes.length ? "#059669" : "#d97706"} />{label && <foreignObject x={label.x} y={label.y} width={label.width} height={label.height}><div className="globe-rate" title="在线节点已上报速率合计"><span className="upload"><ChevronUp size={12} />{speed(sum(onlineNodes.map(server => server.upload_speed)))}</span><span className="download"><ChevronDown size={12} />{speed(sum(onlineNodes.map(server => server.download_speed)))}</span></div><RegionFlag server={cluster.nodes[0]} /></foreignObject>}</g>;
+        return <g key={cluster.code}><title>{`${frankfurtDisplay(cluster.nodes[0].region_name || cluster.code)} · ${cluster.nodes.length} 台；国家级示意位置`}</title><circle cx={cluster.x} cy={cluster.y} r="3" fill={onlineNodes.length ? "#059669" : "#d97706"} />{label && <foreignObject x={label.x} y={label.y} width={label.width} height={label.height}><div className="globe-rate" title="在线节点已上报速率合计"><span className="upload"><ChevronUp size={12} />{speed(sum(onlineNodes.map(server => server.upload_speed)))}</span><span className="download"><ChevronDown size={12} />{speed(sum(onlineNodes.map(server => server.download_speed)))}</span></div><RegionFlag server={cluster.nodes[0]} /></foreignObject>}</g>;
       })}</g>
     </svg>
     <div className="fleet-status" title={`${online} 在线 · ${servers.length - online} 离线`}><span className="positive">● {online}</span><span className="warning">● {servers.length - online}</span></div>
