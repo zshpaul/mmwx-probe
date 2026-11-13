@@ -1,5 +1,29 @@
 # MMWX Probe
 
+## 客户端代理延迟（本地实现）
+
+首页独立显示 Windows 客户端 URLTest 历史，不归属于任何服务器；节点别名仅代表读取时的选中节点，不能证明测速时选中状态。横轴使用真实测速时间，失败、切换和缺测保留断点，不推算丢包。公开页面的组名和节点名必须是用户明确选择的公开别名。
+
+`POST /api/client-latency/v1/samples` 使用独立的 `Authorization: Bearer <CLIENT_LATENCY_TOKEN>`，不能使用主控只读 `PROBE_TOKEN`。仅支持单个配置的写入身份。请求为 `version: 1` 和 `samples` 数组，最多 100 个样本、32 KiB；每个样本必须包含：
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` | 稳定的样本不透明 ID，重试时不变 |
+| `group_id` | 稳定的不透明组 ID |
+| `group_alias` | 用户选择的公开组别名，1–80 字符 |
+| `node` | 用户选择的公开节点别名，1–80 字符，未知为 `null` |
+| `measured_at` | mihomo 原始测速时间，UTC RFC3339 |
+| `observed_at` | 首次读取时间，UTC RFC3339；重试时保持不变 |
+| `status` | `ok`、`failed` 或 `unknown`；缺失测量不能当作失败 |
+| `delay_ms` | 成功时 0–120000 的数值；否则 `null` |
+| `segment` | 不透明分段 ID；切换、状态未知或断连后重新分段 |
+
+不透明 ID 仅接受 1–80 个字母、数字、下划线或连字符；时间使用带 `Z` 的 UTC 格式，最多九位小数，原始字符串会保留。可将 `node` 设为 `null` 隐藏节点身份。样本超过 30 天或时间超前五分钟以上会被拒绝。重试必须保持完整样本不变；一个已确认的 ID 被用于不同内容时，整批返回 409 并回滚。只有整批持久化成功才返回 `200`，响应的 `accepted` 数组包含全部 ID。400、401、409、413、415 需修复请求或配置；网络错误和 429/5xx 可退避重试。
+
+同一路径的 GET 无需登录，响应只包含版本和公开样本的 `group_id`、`group_alias`、`node`、`measured_at`、`status`、`delay_ms`、`segment`。可选 `group` 按不透明组 ID 过滤，`limit` 为 1–10000，默认 10000，返回最近 30 天内最新样本并按时间升序排列。公开响应不含读取时间、样本 ID、controller、测速 URL、设备信息或凭据。上报端不得把这些内容放入公开别名。
+
+配置 `CLIENT_LATENCY_DB` D1 绑定并应用 `migrations/0001_client_latency.sql`；`wrangler.jsonc` 绑定指向已配置的探针 D1 数据库；其他部署必须替换为自己的数据库 ID。另需为 Worker 配置独立 `CLIENT_LATENCY_TOKEN` secret。保留期为 30 天，查询时过滤，写入和每日定时任务会清理过期记录；停止写入时，过期记录通常在下次每日任务后删除。仓库变更本身不会创建数据库、配置密钥或执行部署。
+
 妙妙屋 X（MiaoMiaoWuX）的独立服务器探针前端。项目将 React 静态页面、只读 API 代理和 WebSocket 代理部署到同一个 Cloudflare Worker，访客只接触探针域名，无需直接访问主控域名。
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mmwx-group/mmwx-probe)

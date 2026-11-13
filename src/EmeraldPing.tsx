@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import type { ProbePayload, ProbeServer } from "./types";
 import { triISPRows } from "./tri-isp";
@@ -9,6 +9,28 @@ import { usePingHistory } from "./use-ping-history";
 
 const Trend = lazy(() => import("./Trend"));
 const colors = ["#FF6B6B", "#4ECDC4", "#A78BFA", "#60A5FA", "#FFB347"];
+type PingBar = { time?: number; latency?: number; loss?: number; tooltip?: string };
+export function PingSummaryLayout({ carrier, children, compact = false }: { carrier?: ReactNode; children?: ReactNode; compact?: boolean }) {
+  return <div className={`emerald-ping${compact ? " compact" : ""}`}><div className="fact-row"><span>三网</span><i /><span className="carrier-values">{carrier}</span></div>{children}</div>;
+}
+export function PingPanels({ name, bars, latency, loss, onOpen, loading, error, client = false, placeholderLoss = false, latencyText }: {
+  name: string; bars: PingBar[]; latency?: number; loss?: number; onOpen: () => void;
+  loading?: boolean; error?: string; client?: boolean; placeholderLoss?: boolean; latencyText?: string;
+}) {
+  return <div className="ping-panels">{(["latency", "loss"] as const).map(metric => {
+    const label = metric === "latency" ? "延迟" : "丢包";
+    const value = metric === "latency" ? latency : loss;
+    const unavailable = client && metric === "loss";
+    const panel = <><span className="fact-row"><span>{label}</span><i /><span title={unavailable && placeholderLoss ? "占位值，非丢包测量" : undefined}>{unavailable ? (placeholderLoss ? "0.0%" : "") : metric === "latency" && latencyText ? latencyText : value === undefined ? "—" : metric === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`}</span></span>
+      <span className="ping-samples" role={unavailable ? undefined : "img"} aria-label={unavailable ? undefined : client ? "客户端 URLTest 采样条：左旧右新，缺测、切换及失败显示为缺失" : `${label}采样条：左旧右新，颜色表示分段均值`}>
+        {!unavailable && bars.map((bar, index) => {
+          const tooltip = bar.tooltip || error || (loading ? "加载中" : bar.time === undefined ? "暂无数据" : pingSampleTooltip(bar.time, bar[metric], metric));
+          return <span key={index} tabIndex={0} role="img" aria-label={tooltip} data-tooltip={tooltip} className={`ping-sample ${pingTone(bar[metric], metric)}`} />;
+        })}
+      </span></>;
+    return unavailable ? <div key={metric} className="ping-panel">{panel}</div> : <button key={metric} type="button" className="ping-panel" aria-label={client ? `查看 ${name} 客户端 URLTest 延迟历史` : `${name} ${label}`} title={client ? "客户端 URLTest 延迟；读取时选中节点，点击查看历史" : `平均${label}；按已上报目标及采样计算，点击查看历史`} onClick={event => { event.preventDefault(); event.stopPropagation(); onOpen(); }}>{panel}</button>;
+  })}</div>;
+}
 export function PingRouteLabel({ server, isp }: { server: ProbeServer; isp?: string }) {
   const route = latestReturnRoute(server.return_routes, isp);
   const label = route?.route_type?.trim();
@@ -20,25 +42,12 @@ export function EmeraldPingSummary({ server, index = 0, tri, onOpen, compact = f
   const rows = triISPRows(tri, server.ping || []);
   const { data, loading, error } = usePingHistory(index, server, "1h", !compact);
   const stats = pingSummary(data?.all_series || [], data);
-  return <div className={`emerald-ping${compact ? " compact" : ""}`}>
-    <div className="fact-row"><span>三网</span><i /><span className="carrier-values">{(rows.length ? rows : ["电信", "联通", "移动"].map(label => ({ label, series: undefined }))).slice(0, 3).map((row, index) => {
+  return <PingSummaryLayout compact={compact} carrier={(rows.length ? rows : ["电信", "联通", "移动"].map(label => ({ label, series: undefined }))).slice(0, 3).map((row, index) => {
       const value = row.series && server.online && validLatency(row.series.current_ms) && validLoss(row.series.loss_pct) && row.series.loss_pct < 100 ? row.series.current_ms : undefined;
       return <span key={index} title={`${row.label}${row.series?.label && row.series.label !== row.label ? ` · ${row.series.label}` : ""}：${value === undefined ? "无响应或未上报" : `${Math.round(value)} ms`}`} className={`ping-text ${pingTone(value, "latency")}`}>{index > 0 && <b> · </b>}{value === undefined ? "—" : `${Math.round(value)}ms`}</span>;
-    })}</span></div>
-    {!compact && <div className="ping-panels">{(["latency", "loss"] as const).map(metric => {
-      const label = metric === "latency" ? "延迟" : "丢包";
-      const value = stats[metric];
-      return <button key={metric} type="button" className="ping-panel" aria-label={`${server.name || "节点"} ${label}`} title={`平均${label}；按已上报目标及采样计算，点击查看历史`} onClick={event => { event.preventDefault(); event.stopPropagation(); onOpen(); }}>
-        <span className="fact-row"><span>{label}</span><i /><span>{value === undefined ? "—" : metric === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`}</span></span>
-        <span className="ping-samples" role="img" aria-label={`${label}采样条：左旧右新，颜色表示分段均值`}>
-          {stats.bars.map((bar, index) => {
-            const tooltip = error || (loading ? "加载中" : bar.time === undefined ? "暂无数据" : pingSampleTooltip(bar.time, bar[metric], metric));
-            return <span key={index} tabIndex={0} role="img" aria-label={tooltip} data-tooltip={tooltip} className={`ping-sample ${pingTone(bar[metric], metric)}`} />;
-          })}
-        </span>
-      </button>;
-    })}</div>}
-  </div>;
+    })}>
+    {!compact && <PingPanels name={server.name || "节点"} bars={stats.bars} latency={stats.latency} loss={stats.loss} onOpen={onOpen} loading={loading} error={error} />}
+  </PingSummaryLayout>;
 }
 export function PingHistory({ server, index, showRoutes = false }: { server: ProbeServer; index: number; showRoutes?: boolean }) {
   const [range, setRange] = useState<DetailRange>("1h");

@@ -197,6 +197,7 @@ export interface TriISPPublic {
 }
 
 export interface ProbePayload {
+  local_client_only?: boolean;
   enabled: boolean;
   forward?: ForwardChainData[];
   show_globe?: boolean;

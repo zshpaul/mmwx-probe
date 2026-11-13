@@ -15,8 +15,8 @@ export function bytes(value?: number, base = 1024) {
   return `${amount.toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
 }
 export const speed = (value?: number) => isNumber(value) ? `${bytes(value)}/s` : "—";
-export const locationName = (server: ProbeServer) => [server.region_name || server.region || server.region_country, server.region_city].filter((value): value is string => !!value).map(frankfurtDisplay).join(" · ");
-export function nodeLocation(server: ProbeServer): string {
+export const locationName = (server: Partial<ProbeServer>) => [server.region_name || server.region || server.region_country, server.region_city].filter((value): value is string => !!value).map(frankfurtDisplay).join(" · ");
+export function nodeLocation(server: Partial<ProbeServer>): string {
   const location = [server.region_city, server.region_name, server.region].find(value => value?.trim() && !/^(unknown|未知|[-—]+)$/i.test(value.trim()))?.trim() || "";
   return cityDisplay(location);
 }
@@ -57,7 +57,7 @@ export function financeSummary(servers: ProbeServer[], now: number) {
   return [...totals.values()];
 }
 export type PriceCard = { label: string; value: string; unit?: string; title?: string; tone?: string };
-export function priceCards(server: ProbeServer, now: number): PriceCard[] {
+export function priceCards(server: Partial<ProbeServer>, now: number): PriceCard[] {
   const currency = isNumber(server.renewal_price_cny) ? "CNY" : server.renewal_currency;
   const price = isNumber(server.renewal_price_cny) ? server.renewal_price_cny : server.renewal_price;
   const hasPrice = isNumber(price) && price >= 0 && !!currency;
