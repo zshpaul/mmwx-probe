@@ -20,7 +20,7 @@ export type ClientGroup = { id: string; alias: string; samples: ClientSample[] }
 export type ClientPresence = "online" | "offline" | "unknown";
 export function clientPresence(group: ClientGroup, now: number, available: boolean, rate: RatePresence): ClientPresence {
   const measured = Date.parse(group.samples.at(-1)?.measured_at || "");
-  const freshSample = available && Number.isFinite(measured) && now - measured <= 300_000;
+  const freshSample = available && Number.isFinite(measured) && measured <= now && now - measured <= 300_000;
   if (group.id === bwhUsGroupId) {
     if (rate.state === "online") return "online";
     const lastRate = Date.parse(rate.observedAt || "");
