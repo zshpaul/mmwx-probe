@@ -120,6 +120,16 @@ try {
   assert.equal(Object.hasOwn(first.samples[0], "page_rowid"), false);
   assert.ok(first.next_cursor);
   assert.equal((await post([{ ...sample("later"), group_id: "pagination-group", measured_at: sameTime, delay_ms: 39 }])).status, 200);
+  const incrementalUrl = `${endpoint}/api/client-latency/v1/samples?after=${first.snapshot}&limit=1&group=pagination-group`;
+  const increment = await (await fetch(incrementalUrl)).json();
+  assert.equal(increment.samples.length, 1);
+  assert.equal(increment.samples[0].delay_ms, 39);
+  assert.ok(increment.next_after > first.snapshot);
+  assert.equal(increment.has_more, true);
+  const noMore = await (await fetch(`${endpoint}/api/client-latency/v1/samples?after=${increment.next_after}&group=pagination-group`)).json();
+  assert.deepEqual(noMore.samples, []);
+  assert.equal(noMore.has_more, false);
+  assert.equal((await fetch(`${endpoint}/api/client-latency/v1/samples?after=0`)).status, 400);
   const second = await (await fetch(`${pageUrl}&cursor=${first.next_cursor}`)).json();
   assert.equal(second.samples[0].delay_ms, 37);
   const third = await (await fetch(`${pageUrl}&cursor=${second.next_cursor}`)).json();

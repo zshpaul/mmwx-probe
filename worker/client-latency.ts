@@ -66,6 +66,17 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
     if (rawLimit !== null && !/^[1-9]\d{0,4}$/.test(rawLimit)) return json({ error: "invalid limit" }, 400);
     const limit = rawLimit === null ? 10000 : Number(rawLimit);
     if (limit > 10000) return json({ error: "invalid limit" }, 400);
+    const after = url.searchParams.get("after");
+    if (after !== null) {
+      if (group === null || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after))) return json({ error: "invalid cursor" }, 400);
+      const { results } = await db.prepare(`SELECT rowid AS page_rowid, group_id, group_alias, node, measured_at, status, delay_ms, segment
+        FROM client_latency WHERE rowid > ? AND group_id = ? AND measured_ms >= ? ORDER BY rowid ASC LIMIT ?`)
+        .bind(Number(after), group, cutoff, limit).all();
+      const last = results[results.length - 1] as Record<string, unknown> | undefined;
+      const next_after = last ? Number(last.page_rowid) : Number(after);
+      const samples = results.map(({ page_rowid: _rowid, ...sample }) => sample);
+      return json({ version: 1, samples, next_after, has_more: results.length === limit });
+    }
     if (url.searchParams.get("summary") === "1") {
       const { results } = await db.prepare(`WITH RECURSIVE groups(group_id) AS (
         SELECT MIN(group_id) FROM client_latency
@@ -93,7 +104,7 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
       const last = results[results.length - 1] as Record<string, unknown> | undefined;
       const next_cursor = results.length === limit && last ? `${snapshot}.${last.page_time}.${last.page_rowid}` : null;
       const samples = results.map(({ page_rowid: _rowid, page_time: _time, ...sample }) => sample);
-      return json({ version: 1, samples, next_cursor });
+      return json({ version: 1, samples, next_cursor, snapshot });
     }
     const { results } = await db.prepare(
       "SELECT group_id, group_alias, node, measured_at, status, delay_ms, segment FROM (SELECT group_id, group_alias, node, measured_at, status, delay_ms, segment, measured_ms, id FROM client_latency WHERE measured_ms >= ? AND (? IS NULL OR group_id = ?) ORDER BY measured_ms DESC, id DESC LIMIT ?) ORDER BY measured_ms ASC, id ASC"

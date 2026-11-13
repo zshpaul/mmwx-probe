@@ -102,34 +102,60 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
+    let loading = false;
+    let after: number | undefined;
     const load = async () => {
+      if (loading) return;
+      loading = true;
       try {
-        const pages: ClientSample[][] = [];
-        const seen = new Set<string>();
-        let cursor: string | null = null;
-        do {
-          const query = new URLSearchParams({ paged: "1", limit: "1000", group: group.id });
-          if (cursor) query.set("cursor", cursor);
-          const data = await requestJson<{ version: number; samples: ClientSample[]; next_cursor: string | null }>(`/api/client-latency/v1/samples?${query}`, { signal: controller.signal, cache: "no-store" });
-          if (data.version !== 1 || !Array.isArray(data.samples) || (data.next_cursor !== null && typeof data.next_cursor !== "string")) throw new Error("invalid response");
-          pages.push(data.samples);
-          cursor = data.next_cursor;
-          if (cursor && seen.has(cursor)) throw new Error("repeated cursor");
-          if (cursor) seen.add(cursor);
-        } while (cursor);
-        if (active) setHistory(pages.reverse().flatMap(page => page.reverse()));
+        if (after === undefined) {
+          const pages: ClientSample[][] = [];
+          const seen = new Set<string>();
+          let cursor: string | null = null;
+          let snapshot: number | undefined;
+          do {
+            const query = new URLSearchParams({ paged: "1", limit: "1000", group: group.id });
+            if (cursor) query.set("cursor", cursor);
+            const data = await requestJson<{ version: number; samples: ClientSample[]; next_cursor: string | null; snapshot: number }>(`/api/client-latency/v1/samples?${query}`, { signal: controller.signal, cache: "no-store" });
+            if (data.version !== 1 || !Array.isArray(data.samples) || !Number.isSafeInteger(data.snapshot) || data.snapshot < 0 || (data.next_cursor !== null && typeof data.next_cursor !== "string")) throw new Error("invalid response");
+            if (snapshot !== undefined && snapshot !== data.snapshot) throw new Error("snapshot changed");
+            snapshot = data.snapshot;
+            pages.push(data.samples);
+            cursor = data.next_cursor;
+            if (cursor && seen.has(cursor)) throw new Error("repeated cursor");
+            if (cursor) seen.add(cursor);
+          } while (cursor);
+          after = snapshot;
+          if (active) setHistory(pages.reverse().flatMap(page => page.reverse()));
+        } else {
+          const added: ClientSample[] = [];
+          let next = after;
+          let more: boolean;
+          do {
+            const query = new URLSearchParams({ after: String(next), limit: "1000", group: group.id });
+            const data = await requestJson<{ version: number; samples: ClientSample[]; next_after: number; has_more: boolean }>(`/api/client-latency/v1/samples?${query}`, { signal: controller.signal, cache: "no-store" });
+            if (data.version !== 1 || !Array.isArray(data.samples) || !Number.isSafeInteger(data.next_after) || data.next_after < next || typeof data.has_more !== "boolean" || (data.has_more && data.next_after === next)) throw new Error("invalid response");
+            added.push(...data.samples);
+            next = data.next_after;
+            more = data.has_more;
+          } while (more);
+          after = next;
+          if (active) setHistory(previous => [...(previous || []), ...added].filter(sample => Date.parse(sample.measured_at) >= Date.now() - 30 * 86400_000).sort((a, b) => Date.parse(a.measured_at) - Date.parse(b.measured_at)));
+        }
+        if (active) setHistoryError(undefined);
       } catch {
         if (active) setHistoryError("\u5ba2\u6237\u7aef\u5ef6\u8fdf\u5386\u53f2\u6682\u4e0d\u53ef\u7528");
-      }
+      } finally { loading = false; }
     };
     void load();
-    return () => { active = false; controller.abort(); };
+    const timer = setInterval(() => void load(), 60_000);
+    return () => { active = false; controller.abort(); clearInterval(timer); };
   }, [group.id]);
   const latest = group.samples.at(-1);
   return <dialog ref={dialog} className="ping-dialog" aria-label={`${group.alias} 客户端代理延迟历史`} onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="dialog-heading"><h2>{group.alias} · 客户端代理延迟</h2><button className="icon-button" aria-label="关闭客户端延迟详情" onClick={onClose}><X size={18} /></button></div>
     <p className="client-dialog-note">Windows 客户端 URLTest · 近 30 天；读取时选中节点：{latest?.node || "未公开或未知"}。测速发生时是否选中无法确认。</p>
     <p className="client-dialog-note">最近测量：{measuredTime(latest)} · {status(latest)}。切换、失败或缺测处断开。</p>
-    <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(history || [])} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={historyError} timeScale showPoints /></Suspense>
+    <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(history || [])} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={history ? undefined : historyError} timeScale showPoints /></Suspense>
   </dialog>;
 }
