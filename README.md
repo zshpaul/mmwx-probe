@@ -24,7 +24,7 @@ The history dialog uses `GET /api/client-latency/v1/samples?paged=1&limit=1000` 
 
 同一路径的 GET 无需登录，响应只包含版本和公开样本的 `group_id`、`group_alias`、`node`、`measured_at`、`status`、`delay_ms`、`segment`。可选 `group` 按不透明组 ID 过滤，`limit` 为 1–10000，默认 10000，返回最近 30 天内最新样本并按时间升序排列。公开响应不含读取时间、样本 ID、controller、测速 URL、设备信息或凭据。上报端不得把这些内容放入公开别名。
 
-配置 `CLIENT_LATENCY_DB` D1 绑定并应用 `migrations/0001_client_latency.sql`, `migrations/0002_client_quota.sql`, `migrations/0003_client_rate.sql`；`wrangler.jsonc` 绑定指向已配置的探针 D1 数据库；其他部署必须替换为自己的数据库 ID。另需为 Worker 配置独立 `CLIENT_LATENCY_TOKEN` secret。保留期为 30 天，查询时过滤，写入和每日定时任务会清理过期记录；停止写入时，过期记录通常在下次每日任务后删除。仓库变更本身不会创建数据库、配置密钥或执行部署。
+配置 `CLIENT_LATENCY_DB` D1 绑定并应用 `migrations/0001_client_latency.sql`, `migrations/0002_client_quota.sql`, `migrations/0003_client_rate.sql`, `migrations/0004_client_latency_sequence.sql`；`wrangler.jsonc` 绑定指向已配置的探针 D1 数据库；其他部署必须替换为自己的数据库 ID。另需为 Worker 配置独立 `CLIENT_LATENCY_TOKEN` secret。保留期为 30 天，查询时过滤，写入和每日定时任务会清理过期记录；停止写入时，过期记录通常在下次每日任务后删除。仓库变更本身不会创建数据库、配置密钥或执行部署。
 
 妙妙屋 X（MiaoMiaoWuX）的独立服务器探针前端。项目将 React 静态页面、只读 API 代理和 WebSocket 代理部署到同一个 Cloudflare Worker，访客只接触探针域名，无需直接访问主控域名。
 

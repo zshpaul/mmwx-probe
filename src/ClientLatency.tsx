@@ -156,6 +156,7 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
     <div className="dialog-heading"><h2>{group.alias} · 客户端代理延迟</h2><button className="icon-button" aria-label="关闭客户端延迟详情" onClick={onClose}><X size={18} /></button></div>
     <p className="client-dialog-note">Windows 客户端 URLTest · 近 30 天；读取时选中节点：{latest?.node || "未公开或未知"}。测速发生时是否选中无法确认。</p>
     <p className="client-dialog-note">最近测量：{measuredTime(latest)} · {status(latest)}。切换、失败或缺测处断开。</p>
+    {history && historyError && <p className="client-dialog-note" role="status">{historyError}{"\uff0c\u663e\u793a\u4e0a\u6b21\u6570\u636e\uff0c\u6b63\u5728\u91cd\u8bd5\u3002"}</p>}
     <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(history || [])} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={history ? undefined : historyError} timeScale showPoints /></Suspense>
   </dialog>;
 }

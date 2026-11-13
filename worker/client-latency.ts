@@ -69,12 +69,13 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
     const after = url.searchParams.get("after");
     if (after !== null) {
       if (group === null || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after))) return json({ error: "invalid cursor" }, 400);
-      const { results } = await db.prepare(`SELECT rowid AS page_rowid, group_id, group_alias, node, measured_at, status, delay_ms, segment
-        FROM client_latency WHERE rowid > ? AND group_id = ? AND measured_ms >= ? ORDER BY rowid ASC LIMIT ?`)
+      const { results } = await db.prepare(`SELECT seq.seq AS page_seq, sample.group_id, sample.group_alias, sample.node, sample.measured_at, sample.status, sample.delay_ms, sample.segment
+        FROM client_latency_sequence AS seq JOIN client_latency AS sample ON sample.writer_id = seq.writer_id AND sample.id = seq.id
+        WHERE seq.seq > ? AND sample.group_id = ? AND sample.measured_ms >= ? ORDER BY seq.seq ASC LIMIT ?`)
         .bind(Number(after), group, cutoff, limit).all();
       const last = results[results.length - 1] as Record<string, unknown> | undefined;
-      const next_after = last ? Number(last.page_rowid) : Number(after);
-      const samples = results.map(({ page_rowid: _rowid, ...sample }) => sample);
+      const next_after = last ? Number(last.page_seq) : Number(after);
+      const samples = results.map(({ page_seq: _seq, ...sample }) => sample);
       return json({ version: 1, samples, next_after, has_more: results.length === limit });
     }
     if (url.searchParams.get("summary") === "1") {
@@ -93,17 +94,18 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
       const cursor = url.searchParams.get("cursor");
       const parts = cursor === null ? null : cursor.split(".").map(Number);
       if (parts && (parts.length !== 3 || parts.some(n => !Number.isSafeInteger(n) || n < 0) || !/^\d+\.\d+\.\d+$/.test(cursor!))) return json({ error: "invalid cursor" }, 400);
-      const snapshot = parts ? parts[0] : Number((await db.prepare("SELECT COALESCE(MAX(rowid), 0) AS max_rowid FROM client_latency").all()).results[0]?.max_rowid ?? 0);
+      const snapshot = parts ? parts[0] : Number((await db.prepare("SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'client_latency_sequence'), 0) AS max_rowid").all()).results[0]?.max_rowid ?? 0);
       const beforeTime = parts ? parts[1] : Number.MAX_SAFE_INTEGER;
       const beforeRow = parts ? parts[2] : Number.MAX_SAFE_INTEGER;
-      const { results } = await db.prepare(`SELECT rowid AS page_rowid, measured_ms AS page_time, group_id, group_alias, node, measured_at, status, delay_ms, segment
-        FROM client_latency WHERE measured_ms >= ? AND (? IS NULL OR group_id = ?) AND rowid <= ?
-        AND (measured_ms < ? OR (measured_ms = ? AND rowid < ?))
-        ORDER BY measured_ms DESC, rowid DESC LIMIT ?`)
+      const { results } = await db.prepare(`SELECT seq.seq AS page_seq, sample.measured_ms AS page_time, sample.group_id, sample.group_alias, sample.node, sample.measured_at, sample.status, sample.delay_ms, sample.segment
+        FROM client_latency AS sample JOIN client_latency_sequence AS seq ON seq.writer_id = sample.writer_id AND seq.id = sample.id
+        WHERE sample.measured_ms >= ? AND (? IS NULL OR sample.group_id = ?) AND seq.seq <= ?
+        AND (sample.measured_ms < ? OR (sample.measured_ms = ? AND seq.seq < ?))
+        ORDER BY sample.measured_ms DESC, seq.seq DESC LIMIT ?`)
         .bind(cutoff, group, group, snapshot, beforeTime, beforeTime, beforeRow, limit).all();
       const last = results[results.length - 1] as Record<string, unknown> | undefined;
-      const next_cursor = results.length === limit && last ? `${snapshot}.${last.page_time}.${last.page_rowid}` : null;
-      const samples = results.map(({ page_rowid: _rowid, page_time: _time, ...sample }) => sample);
+      const next_cursor = results.length === limit && last ? `${snapshot}.${last.page_time}.${last.page_seq}` : null;
+      const samples = results.map(({ page_seq: _seq, page_time: _time, ...sample }) => sample);
       return json({ version: 1, samples, next_cursor, snapshot });
     }
     const { results } = await db.prepare(

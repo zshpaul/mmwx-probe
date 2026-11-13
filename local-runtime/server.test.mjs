@@ -130,6 +130,13 @@ try {
   assert.deepEqual(noMore.samples, []);
   assert.equal(noMore.has_more, false);
   assert.equal((await fetch(`${endpoint}/api/client-latency/v1/samples?after=0`)).status, 400);
+  const deleteDb = new DatabaseSync(join(data, "client-latency.sqlite"));
+  deleteDb.prepare("DELETE FROM client_latency WHERE id = ?").run("later");
+  deleteDb.close();
+  assert.equal((await post([{ ...sample("after-delete"), group_id: "pagination-group", measured_at: sameTime, delay_ms: 40 }])).status, 200);
+  const afterDelete = await (await fetch(`${endpoint}/api/client-latency/v1/samples?after=${increment.next_after}&group=pagination-group`)).json();
+  assert.equal(afterDelete.samples[0].delay_ms, 40);
+  assert.ok(afterDelete.next_after > increment.next_after);
   const second = await (await fetch(`${pageUrl}&cursor=${first.next_cursor}`)).json();
   assert.equal(second.samples[0].delay_ms, 37);
   const third = await (await fetch(`${pageUrl}&cursor=${second.next_cursor}`)).json();
