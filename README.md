@@ -4,6 +4,8 @@
 
 首页独立显示 Windows 客户端 URLTest 历史，不归属于任何服务器；节点别名仅代表读取时的选中节点，不能证明测速时选中状态。横轴使用真实测速时间，失败、切换和缺测保留断点，不推算丢包。公开页面的组名和节点名必须是用户明确选择的公开别名。
 
+BWH-US 的在线状态依据现有速率快照按服务端接收时间计算的 30 秒有效期；速率为未知但快照仍新鲜时仍视为有上报。速率读取失败时不会直接判离线，失去有效证据后显示状态未知；没有速率快照的组显示状态未知，因为延迟采样时间不能证明服务端接收时间。离线卡片仍可打开历史，历史读取失败时保留已加载数据并自动重试。
+
 The history dialog uses `GET /api/client-latency/v1/samples?paged=1&limit=1000` to read the complete retained history. Each page returns newest-first `samples` and `next_cursor`; pass that cursor back as `cursor` until it is null. Pagination fixes the insertion boundary on its first page and returns it as `snapshot`. While the dialog remains open, use `after=<snapshot>&group=<id>` to fetch newly inserted samples, advancing with `next_after` while `has_more` is true. The existing unpaged API remains unchanged.
 
 `POST /api/client-latency/v1/samples` 使用独立的 `Authorization: Bearer <CLIENT_LATENCY_TOKEN>`，不能使用主控只读 `PROBE_TOKEN`。仅支持单个配置的写入身份。请求为 `version: 1` 和 `samples` 数组，最多 100 个样本、32 KiB；每个样本必须包含：

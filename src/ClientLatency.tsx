@@ -2,6 +2,8 @@
 import { Activity, X } from "lucide-react";
 import { requestJson } from "./request-json";
 import { PingPanels, PingSummaryLayout } from "./EmeraldPing";
+import { bwhUsGroupId } from "./client-latency-prices";
+import type { RatePresence } from "./client-rate";
 const Trend = lazy(() => import("./Trend"));
 
 export type ClientSample = {
@@ -14,6 +16,13 @@ export type ClientSample = {
   segment: string;
 };
 export type ClientGroup = { id: string; alias: string; samples: ClientSample[] };
+
+export type ClientPresence = "online" | "offline" | "unknown";
+export function clientPresence(group: ClientGroup, _now: number, _available: boolean, rate: RatePresence): ClientPresence {
+  // Latency timestamps are supplied by the client and do not establish receipt time.
+  // The rate endpoint's TTL is bounded by the server's actual receipt time.
+  return group.id === bwhUsGroupId ? rate.state : "unknown";
+}
 
 export function clientLatencyRows(samples: ClientSample[]) {
   const rows: Record<string, number | null>[] = [];
@@ -35,7 +44,8 @@ export function clientLatencyRows(samples: ClientSample[]) {
 
 export function useClientLatency() {
   const [samples, setSamples] = useState<ClientSample[]>([]);
-  const [error, setError] = useState<string>();
+  const [available, setAvailable] = useState(false);
+  const [checkedAt, setCheckedAt] = useState(Date.now);
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
@@ -46,10 +56,13 @@ export function useClientLatency() {
       try {
         const data = await requestJson<{ version: number; samples: ClientSample[] }>("/api/client-latency/v1/samples?summary=1", { signal: controller.signal, cache: "no-store" });
         if (data.version !== 1 || !Array.isArray(data.samples)) throw new Error("invalid response");
-        if (active) { setSamples(data.samples); setError(undefined); }
+        if (active) { setSamples(data.samples); setAvailable(true); }
       } catch {
-        if (active) setError("客户端延迟历史暂不可用");
-      } finally { loading = false; }
+        if (active) setAvailable(false);
+      } finally {
+        if (active) setCheckedAt(Date.now());
+        loading = false;
+      }
     };
     void load();
     const timer = setInterval(() => void load(), 60_000);
@@ -61,7 +74,7 @@ export function useClientLatency() {
     group.push(sample);
     grouped.set(sample.group_id, group);
   }
-  return { groups: [...grouped].map(([id, entries]) => ({ id, alias: entries[entries.length - 1].group_alias, samples: entries })), error };
+  return { groups: [...grouped].map(([id, entries]) => ({ id, alias: entries[entries.length - 1].group_alias, samples: entries })), available, checkedAt };
 }
 
 function status(sample?: ClientSample) {
@@ -88,10 +101,13 @@ export function ClientLatencySummary({ group, onOpen }: { group: ClientGroup; on
   </PingSummaryLayout>;
 }
 
-export function ClientLatencyList({ groups, onOpen }: { groups: ClientGroup[]; onOpen: (id: string) => void }) {
-  return <div className="client-list" aria-label="客户端代理延迟列表">{groups.map(group => <button key={group.id} className="client-list-row" onClick={() => onOpen(group.id)}>
-    <span><Activity size={15} /><strong>{group.alias}</strong><small>客户端代理延迟</small></span><span>{status(group.samples.at(-1))} · {measuredTime(group.samples.at(-1))}</span>
-  </button>)}</div>;
+export function ClientLatencyList({ groups, onOpen, available, now, ratePresence }: { groups: ClientGroup[]; onOpen: (id: string) => void; available: boolean; now: number; ratePresence: RatePresence }) {
+  return <div className="client-list" aria-label="客户端代理延迟列表">{groups.map(group => {
+    const presence = clientPresence(group, now, available, ratePresence);
+    return <button key={group.id} className="client-list-row" onClick={() => onOpen(group.id)}>
+      <span><Activity size={15} /><strong>{group.alias}</strong><small>客户端代理延迟</small></span><span>{presence === "offline" ? "离线" : presence === "unknown" ? "状态未知" : status(group.samples.at(-1))} · {measuredTime(group.samples.at(-1))}</span>
+    </button>;
+  })}</div>;
 }
 
 export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; onClose: () => void }) {
@@ -144,7 +160,7 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
         }
         if (active) setHistoryError(undefined);
       } catch {
-        if (active) setHistoryError("\u5ba2\u6237\u7aef\u5ef6\u8fdf\u5386\u53f2\u6682\u4e0d\u53ef\u7528");
+        if (active) setHistoryError("正在重试");
       } finally { loading = false; }
     };
     void load();
@@ -156,7 +172,7 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
     <div className="dialog-heading"><h2>{group.alias} · 客户端代理延迟</h2><button className="icon-button" aria-label="关闭客户端延迟详情" onClick={onClose}><X size={18} /></button></div>
     <p className="client-dialog-note">Windows 客户端 URLTest · 近 30 天；读取时选中节点：{latest?.node || "未公开或未知"}。测速发生时是否选中无法确认。</p>
     <p className="client-dialog-note">最近测量：{measuredTime(latest)} · {status(latest)}。切换、失败或缺测处断开。</p>
-    {history && historyError && <p className="client-dialog-note" role="status">{historyError}{"\uff0c\u663e\u793a\u4e0a\u6b21\u6570\u636e\uff0c\u6b63\u5728\u91cd\u8bd5\u3002"}</p>}
+    {history && historyError && <p className="client-dialog-note">显示上次数据 · 正在重试</p>}
     <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(history || [])} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={history ? undefined : historyError} timeScale showPoints /></Suspense>
   </dialog>;
 }
