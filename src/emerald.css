@@ -76,6 +76,7 @@ a.server-card:hover { background: var(--background); transform: translateY(-2px)
 .server-identity { gap: 8px; padding: 12px 0; }
 .status-dot { width: 8px; height: 8px; background: #059669; box-shadow: none; }
 .status-dot.down { background: #dc2626; box-shadow: none; }
+.status-dot.unknown { background: var(--muted); box-shadow: none; }
 .server-identity h2 { font-size: 14px; line-height: 24px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .server-identity h2 { display: flex; align-items: baseline; gap: 6px; }
 .server-identity h2 .card-link, .column-name strong, .detail-heading .node-name { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -119,6 +120,7 @@ a.server-card:hover { background: var(--background); transform: translateY(-2px)
 .stale-facts { filter: blur(4px); opacity: .6; pointer-events: none; }
 .offline-overlay { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
 .offline-overlay strong { color: var(--red); font-size: 14px; font-weight: 400; }
+.offline-history { padding: 2px 6px; background: transparent; color: var(--muted); cursor: pointer; text-decoration: underline; }
 .server-table { display: grid; gap: 8px; }
 .table-heading, .server-row { display: grid; grid-template-columns: 40px 40px minmax(150px, 1fr) repeat(4, minmax(70px, 100px)) 90px; gap: 16px; align-items: center; padding: 8px 12px; min-width: 0; }
 .table-heading button { display: flex; align-items: center; gap: 4px; background: transparent; padding: 0; font-size: 11px; color: var(--muted); text-align: left; }

@@ -1,7 +1,10 @@
 import { isIsolatedPoint } from "./Trend";
-import { clientLatencyRows } from "./ClientLatency";
+import { clientLatencyRows, clientPresence, ClientLatencyList } from "./ClientLatency";
 import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
+import { readRateSnapshot } from "./client-rate";
 import { priceCards } from "./emerald-model";
+import { ServerCard } from "./App";
+import { renderToStaticMarkup } from "react-dom/server";
 const equal = (actual: unknown, expected: unknown) => {
   if (actual !== expected) throw new Error(`Expected ${expected}, got ${actual}`);
 };
@@ -37,3 +40,29 @@ const isolated = Array.from({ length: 101 }, (_, i) => ({ ...sample, measured_at
 const isolatedRows = clientLatencyRows(isolated);
 equal(isolatedRows.length, 201);
 equal(isolatedRows.filter((_, i) => isIsolatedPoint(isolatedRows, "latency", i)).length, 101);
+
+const now = Date.parse("2026-11-13T00:10:00Z");
+const group = { id: bwhUsGroupId, alias: "BWH-US", samples: [{ ...sample, group_id: bwhUsGroupId }] };
+const activeRate = { version: 1, expires_in_ms: 30_000, snapshot: { group_id: bwhUsGroupId, observed_at: "2026-11-13T00:09:59Z", status: "unknown", upload_bps: null, download_bps: null } };
+const live = readRateSnapshot(activeRate, 100);
+equal(live.presence.state, "online");
+equal(live.rate, undefined);
+equal(clientPresence(group, now, true, live.presence), "online"); // Old or failed URLTest is not a stopped client.
+const stale = readRateSnapshot({ ...activeRate, expires_in_ms: 0 }, 0);
+equal(stale.presence.state, "offline");
+equal(clientPresence(group, now, true, stale.presence), "offline");
+equal(clientPresence(group, now, false, { state: "unknown" }), "unknown");
+equal(readRateSnapshot({ ...activeRate, snapshot: null }, 0).presence.state, "unknown");
+equal(readRateSnapshot(activeRate, 30_000).presence.state, "offline");
+const newer = { ...group, samples: [{ ...group.samples[0], measured_at: "2026-11-13T00:10:00Z", status: "failed" as const, delay_ms: null }] };
+equal(clientPresence(newer, now, true, stale.presence), "online"); // A newer failed measurement is still a report.
+equal(clientPresence(newer, now + 31_000, true, stale.presence), "offline");
+equal(clientPresence(newer, now + 31_000, true, { state: "unknown", observedAt: stale.presence.observedAt }), "unknown");
+const offlineMarkup = renderToStaticMarkup(<ServerCard group={group} clientState="offline" index={0} now={now} onPing={() => {}} />);
+equal(offlineMarkup.includes('server-card offline'), true);
+equal(offlineMarkup.includes("离线"), true);
+equal(offlineMarkup.includes("查看历史"), true);
+const onlineMarkup = renderToStaticMarkup(<ServerCard group={group} clientState="online" index={0} now={now} onPing={() => {}} />);
+equal(onlineMarkup.includes('server-card offline'), false);
+const unknownList = renderToStaticMarkup(<ClientLatencyList groups={[group]} now={now} available={false} ratePresence={{ state: "unknown" }} onOpen={() => {}} />);
+equal(unknownList.includes("状态未知"), true);
