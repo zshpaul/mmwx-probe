@@ -39,14 +39,28 @@ export function useClientLatency() {
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
+    let loading = false;
     const load = async () => {
+      if (loading) return;
+      loading = true;
       try {
-        const data = await requestJson<{ version: number; samples: ClientSample[] }>("/api/client-latency/v1/samples", { signal: controller.signal, cache: "no-store" });
-        if (data.version !== 1 || !Array.isArray(data.samples)) throw new Error("invalid response");
-        if (active) { setSamples(data.samples); setError(undefined); }
+        const pages: ClientSample[][] = [];
+        const seen = new Set<string>();
+        let cursor: string | null = null;
+        do {
+          const query = new URLSearchParams({ paged: "1", limit: "1000" });
+          if (cursor) query.set("cursor", cursor);
+          const data = await requestJson<{ version: number; samples: ClientSample[]; next_cursor: string | null }>(`/api/client-latency/v1/samples?${query}`, { signal: controller.signal, cache: "no-store" });
+          if (data.version !== 1 || !Array.isArray(data.samples) || (data.next_cursor !== null && typeof data.next_cursor !== "string")) throw new Error("invalid response");
+          pages.push(data.samples);
+          cursor = data.next_cursor;
+          if (cursor && seen.has(cursor)) throw new Error("repeated cursor");
+          if (cursor) seen.add(cursor);
+        } while (cursor);
+        if (active) { setSamples(pages.reverse().flatMap(page => page.reverse())); setError(undefined); }
       } catch {
         if (active) setError("客户端延迟历史暂不可用");
-      }
+      } finally { loading = false; }
     };
     void load();
     const timer = setInterval(() => void load(), 60_000);
@@ -68,7 +82,7 @@ function measuredTime(sample?: ClientSample) {
   if (!sample || !Number.isFinite(Date.parse(sample.measured_at))) return "暂无测量时间";
   return new Date(sample.measured_at).toLocaleString("zh-CN", { hour12: false });
 }
-export function ClientLatencySummary({ group, onOpen, placeholderLoss = false }: { group: ClientGroup; onOpen: () => void; placeholderLoss?: boolean }) {
+export function ClientLatencySummary({ group, onOpen }: { group: ClientGroup; onOpen: () => void }) {
   const latest = group.samples.at(-1);
   const bars: { time?: number; latency?: number; tooltip?: string }[] = [];
   let previous: ClientSample | undefined;
@@ -81,7 +95,7 @@ export function ClientLatencySummary({ group, onOpen, placeholderLoss = false }:
   const padded = [...Array.from({ length: 10 - recent.length }, () => ({})), ...recent];
   return <PingSummaryLayout>
     <PingPanels name={group.alias} bars={padded} latency={latest?.status === "ok" ? latest.delay_ms ?? undefined : undefined}
-      latencyText={latest?.status === "failed" ? "测速失败" : undefined} client placeholderLoss={placeholderLoss} onOpen={onOpen} />
+      latencyText={latest?.status === "failed" ? "测速失败" : undefined} client onOpen={onOpen} />
   </PingSummaryLayout>;
 }
 

@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { EmeraldPingSummary } from "./EmeraldPing";
+import { EmeraldPingSummary, PingPanels } from "./EmeraldPing";
 import { pingSummary, pingHistoryRows, pingSampleTooltip, pingTone, smoothPingRows } from "./emerald-ping";
 import { financeSummary } from "./emerald-model";
 import type { ProbeServer } from "./types";
@@ -45,3 +45,6 @@ const finance = financeSummary([
 ], now);
 check(finance.length === 2 && finance[0].remaining === 10 && finance[0].monthly === 30 && finance[1].currency === "USD", "Currency separation or remaining value calculation failed");
 check(financeSummary([{ online: true, renewal_price_cny: 99 }], now)[0].periodic === 0, "Unknown billing cycle must not imply a measured zero monthly cost");
+
+const clientMarkup = renderToStaticMarkup(<PingPanels name="Client" bars={[]} client onOpen={() => {}} />);
+check(clientMarkup.includes("\u672a\u6d4b\u91cf\u4e22\u5305") && !clientMarkup.includes("0.0%"), "Client loss must be unavailable, not a measured zero");

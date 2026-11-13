@@ -4,6 +4,8 @@
 
 首页独立显示 Windows 客户端 URLTest 历史，不归属于任何服务器；节点别名仅代表读取时的选中节点，不能证明测速时选中状态。横轴使用真实测速时间，失败、切换和缺测保留断点，不推算丢包。公开页面的组名和节点名必须是用户明确选择的公开别名。
 
+The dashboard uses `GET /api/client-latency/v1/samples?paged=1&limit=1000` to read the complete retained history. Each page returns newest-first `samples` and `next_cursor`; pass that cursor back as `cursor` until it is null. Pagination fixes the insertion boundary on its first page; newly added samples appear on the next refresh. The existing unpaged API remains unchanged.
+
 `POST /api/client-latency/v1/samples` 使用独立的 `Authorization: Bearer <CLIENT_LATENCY_TOKEN>`，不能使用主控只读 `PROBE_TOKEN`。仅支持单个配置的写入身份。请求为 `version: 1` 和 `samples` 数组，最多 100 个样本、32 KiB；每个样本必须包含：
 
 | 字段 | 说明 |

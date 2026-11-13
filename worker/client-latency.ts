@@ -66,6 +66,23 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
     if (rawLimit !== null && !/^[1-9]\d{0,4}$/.test(rawLimit)) return json({ error: "invalid limit" }, 400);
     const limit = rawLimit === null ? 10000 : Number(rawLimit);
     if (limit > 10000) return json({ error: "invalid limit" }, 400);
+    if (url.searchParams.get("paged") === "1") {
+      const cursor = url.searchParams.get("cursor");
+      const parts = cursor === null ? null : cursor.split(".").map(Number);
+      if (parts && (parts.length !== 3 || parts.some(n => !Number.isSafeInteger(n) || n < 0) || !/^\d+\.\d+\.\d+$/.test(cursor!))) return json({ error: "invalid cursor" }, 400);
+      const snapshot = parts ? parts[0] : Number((await db.prepare("SELECT COALESCE(MAX(rowid), 0) AS max_rowid FROM client_latency").all()).results[0]?.max_rowid ?? 0);
+      const beforeTime = parts ? parts[1] : Number.MAX_SAFE_INTEGER;
+      const beforeRow = parts ? parts[2] : Number.MAX_SAFE_INTEGER;
+      const { results } = await db.prepare(`SELECT rowid AS page_rowid, measured_ms AS page_time, group_id, group_alias, node, measured_at, status, delay_ms, segment
+        FROM client_latency WHERE measured_ms >= ? AND (? IS NULL OR group_id = ?) AND rowid <= ?
+        AND (measured_ms < ? OR (measured_ms = ? AND rowid < ?))
+        ORDER BY measured_ms DESC, rowid DESC LIMIT ?`)
+        .bind(cutoff, group, group, snapshot, beforeTime, beforeTime, beforeRow, limit).all();
+      const last = results[results.length - 1] as Record<string, unknown> | undefined;
+      const next_cursor = results.length === limit && last ? `${snapshot}.${last.page_time}.${last.page_rowid}` : null;
+      const samples = results.map(({ page_rowid: _rowid, page_time: _time, ...sample }) => sample);
+      return json({ version: 1, samples, next_cursor });
+    }
     const { results } = await db.prepare(
       "SELECT group_id, group_alias, node, measured_at, status, delay_ms, segment FROM (SELECT group_id, group_alias, node, measured_at, status, delay_ms, segment, measured_ms, id FROM client_latency WHERE measured_ms >= ? AND (? IS NULL OR group_id = ?) ORDER BY measured_ms DESC, id DESC LIMIT ?) ORDER BY measured_ms ASC, id ASC"
     ).bind(cutoff, group, group, limit).all();
