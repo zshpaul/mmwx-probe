@@ -55,13 +55,15 @@ equal(clientPresence(group, now, false, { state: "unknown" }), "unknown");
 equal(readRateSnapshot({ ...activeRate, snapshot: null }, 0).presence.state, "unknown");
 equal(readRateSnapshot(activeRate, 30_000).presence.state, "offline");
 const newer = { ...group, samples: [{ ...group.samples[0], measured_at: "2026-11-13T00:10:00Z", status: "failed" as const, delay_ms: null }] };
-equal(clientPresence(newer, now, true, stale.presence), "online"); // A newer failed measurement is still a report.
+equal(clientPresence(newer, now, true, stale.presence), "offline"); // A client timestamp cannot override a server-expired report.
 equal(clientPresence(newer, now + 31_000, true, stale.presence), "offline");
 equal(clientPresence(newer, now + 31_000, true, { state: "unknown", observedAt: stale.presence.observedAt }), "unknown");
 const future = { ...newer, samples: [{ ...newer.samples[0], measured_at: "2026-11-13T00:15:00Z" }] };
 equal(clientPresence(future, now, true, stale.presence), "offline"); // Accepted clock skew is not evidence of a live client.
 equal(clientPresence({ ...future, id: "other" }, now, true, { state: "unknown" }), "unknown");
 equal(clientPresence(future, now, true, live.presence), "online"); // A fresh rate report remains authoritative.
+equal(clientPresence(future, now + 300_000, true, stale.presence), "offline"); // Catching up to the timestamp cannot revive an old report.
+equal(clientPresence({ ...future, id: "other" }, now + 300_000, true, { state: "unknown" }), "unknown");
 const offlineMarkup = renderToStaticMarkup(<ServerCard group={group} clientState="offline" index={0} now={now} onPing={() => {}} />);
 equal(offlineMarkup.includes('server-card offline'), true);
 equal(offlineMarkup.includes("离线"), true);

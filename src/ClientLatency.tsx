@@ -18,18 +18,10 @@ export type ClientSample = {
 export type ClientGroup = { id: string; alias: string; samples: ClientSample[] };
 
 export type ClientPresence = "online" | "offline" | "unknown";
-export function clientPresence(group: ClientGroup, now: number, available: boolean, rate: RatePresence): ClientPresence {
-  const measured = Date.parse(group.samples.at(-1)?.measured_at || "");
-  const freshSample = available && Number.isFinite(measured) && measured <= now && now - measured <= 300_000;
-  if (group.id === bwhUsGroupId) {
-    if (rate.state === "online") return "online";
-    const lastRate = Date.parse(rate.observedAt || "");
-    const newerReport = freshSample && Number.isFinite(lastRate) && measured > lastRate && now - measured <= 30_000;
-    if (newerReport) return "online";
-    if (rate.state === "offline") return "offline";
-    if (Number.isFinite(lastRate)) return "unknown";
-  }
-  return freshSample ? "online" : "unknown";
+export function clientPresence(group: ClientGroup, _now: number, _available: boolean, rate: RatePresence): ClientPresence {
+  // Latency timestamps are supplied by the client and do not establish receipt time.
+  // The rate endpoint's TTL is bounded by the server's actual receipt time.
+  return group.id === bwhUsGroupId ? rate.state : "unknown";
 }
 
 export function clientLatencyRows(samples: ClientSample[]) {
