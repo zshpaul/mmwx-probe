@@ -66,6 +66,18 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
     if (rawLimit !== null && !/^[1-9]\d{0,4}$/.test(rawLimit)) return json({ error: "invalid limit" }, 400);
     const limit = rawLimit === null ? 10000 : Number(rawLimit);
     if (limit > 10000) return json({ error: "invalid limit" }, 400);
+    if (url.searchParams.get("summary") === "1") {
+      const { results } = await db.prepare(`WITH RECURSIVE groups(group_id) AS (
+        SELECT MIN(group_id) FROM client_latency
+        UNION ALL SELECT (SELECT MIN(group_id) FROM client_latency WHERE group_id > groups.group_id)
+          FROM groups WHERE group_id IS NOT NULL
+      ) SELECT sample.group_id, sample.group_alias, sample.node, sample.measured_at, sample.status, sample.delay_ms, sample.segment
+        FROM groups JOIN client_latency AS sample ON sample.rowid IN (
+          SELECT rowid FROM client_latency WHERE group_id = groups.group_id AND measured_ms >= ?
+          ORDER BY measured_ms DESC, rowid DESC LIMIT 10
+        ) ORDER BY sample.measured_ms ASC, sample.rowid ASC`).bind(cutoff).all();
+      return json({ version: 1, samples: results });
+    }
     if (url.searchParams.get("paged") === "1") {
       const cursor = url.searchParams.get("cursor");
       const parts = cursor === null ? null : cursor.split(".").map(Number);

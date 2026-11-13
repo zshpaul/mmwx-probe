@@ -44,20 +44,9 @@ export function useClientLatency() {
       if (loading) return;
       loading = true;
       try {
-        const pages: ClientSample[][] = [];
-        const seen = new Set<string>();
-        let cursor: string | null = null;
-        do {
-          const query = new URLSearchParams({ paged: "1", limit: "1000" });
-          if (cursor) query.set("cursor", cursor);
-          const data = await requestJson<{ version: number; samples: ClientSample[]; next_cursor: string | null }>(`/api/client-latency/v1/samples?${query}`, { signal: controller.signal, cache: "no-store" });
-          if (data.version !== 1 || !Array.isArray(data.samples) || (data.next_cursor !== null && typeof data.next_cursor !== "string")) throw new Error("invalid response");
-          pages.push(data.samples);
-          cursor = data.next_cursor;
-          if (cursor && seen.has(cursor)) throw new Error("repeated cursor");
-          if (cursor) seen.add(cursor);
-        } while (cursor);
-        if (active) { setSamples(pages.reverse().flatMap(page => page.reverse())); setError(undefined); }
+        const data = await requestJson<{ version: number; samples: ClientSample[] }>("/api/client-latency/v1/samples?summary=1", { signal: controller.signal, cache: "no-store" });
+        if (data.version !== 1 || !Array.isArray(data.samples)) throw new Error("invalid response");
+        if (active) { setSamples(data.samples); setError(undefined); }
       } catch {
         if (active) setError("客户端延迟历史暂不可用");
       } finally { loading = false; }
@@ -108,11 +97,39 @@ export function ClientLatencyList({ groups, onOpen }: { groups: ClientGroup[]; o
 export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { const element = dialog.current; element?.showModal(); return () => element?.close(); }, []);
+  const [history, setHistory] = useState<ClientSample[]>();
+  const [historyError, setHistoryError] = useState<string>();
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    const load = async () => {
+      try {
+        const pages: ClientSample[][] = [];
+        const seen = new Set<string>();
+        let cursor: string | null = null;
+        do {
+          const query = new URLSearchParams({ paged: "1", limit: "1000", group: group.id });
+          if (cursor) query.set("cursor", cursor);
+          const data = await requestJson<{ version: number; samples: ClientSample[]; next_cursor: string | null }>(`/api/client-latency/v1/samples?${query}`, { signal: controller.signal, cache: "no-store" });
+          if (data.version !== 1 || !Array.isArray(data.samples) || (data.next_cursor !== null && typeof data.next_cursor !== "string")) throw new Error("invalid response");
+          pages.push(data.samples);
+          cursor = data.next_cursor;
+          if (cursor && seen.has(cursor)) throw new Error("repeated cursor");
+          if (cursor) seen.add(cursor);
+        } while (cursor);
+        if (active) setHistory(pages.reverse().flatMap(page => page.reverse()));
+      } catch {
+        if (active) setHistoryError("\u5ba2\u6237\u7aef\u5ef6\u8fdf\u5386\u53f2\u6682\u4e0d\u53ef\u7528");
+      }
+    };
+    void load();
+    return () => { active = false; controller.abort(); };
+  }, [group.id]);
   const latest = group.samples.at(-1);
   return <dialog ref={dialog} className="ping-dialog" aria-label={`${group.alias} 客户端代理延迟历史`} onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="dialog-heading"><h2>{group.alias} · 客户端代理延迟</h2><button className="icon-button" aria-label="关闭客户端延迟详情" onClick={onClose}><X size={18} /></button></div>
     <p className="client-dialog-note">Windows 客户端 URLTest · 近 30 天；读取时选中节点：{latest?.node || "未公开或未知"}。测速发生时是否选中无法确认。</p>
     <p className="client-dialog-note">最近测量：{measuredTime(latest)} · {status(latest)}。切换、失败或缺测处断开。</p>
-    <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(group.samples)} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={false} timeScale showPoints /></Suspense>
+    <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(history || [])} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={historyError} timeScale showPoints /></Suspense>
   </dialog>;
 }

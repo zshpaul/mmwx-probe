@@ -7,6 +7,11 @@ const signalPalette = ["var(--lime)", "var(--green)", "var(--purple)", "var(--or
 const timeLabel = (time: number) => new Date(time * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 const fullTime = (time: number) => new Date(time * 1000).toLocaleString("zh-CN", { hour12: false });
 
+export function isIsolatedPoint(rows: Record<string, number | null>[], key: string, index: number) {
+  const present = (i: number) => typeof rows[i]?.[key] === "number" && Number.isFinite(rows[i][key]);
+  return present(index) && !present(index - 1) && !present(index + 1);
+}
+
 export default function Trend({ title, summary, unit, rows, lines, loading, error, domain, lossMarkers = [], showLines = true, lossKeys, hideHeading = false, timeScale = false, showPoints = false }: {
   title: string;
   summary?: string;
@@ -48,7 +53,11 @@ export default function Trend({ title, summary, unit, rows, lines, loading, erro
             }} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12 }} />
             {lines.length > 1 && <Legend iconSize={10} iconType="square" wrapperStyle={{ fontSize: 10 }} formatter={value => <span style={{ color: "var(--muted)" }}>{value}</span>} />}
             {lossMarkers.map((marker, index) => <ReferenceLine key={`${marker.time}-${index}`} x={marker.time} stroke={marker.color} strokeOpacity={.55} strokeWidth={1} />)}
-            {lines.map((line, index) => <Area key={line.key} type="linear" dataKey={line.key} name={line.name} stroke={line.color || palette[index % palette.length]} strokeOpacity={showLines ? 1 : 0} fill={`url(#${identifier}-${line.key})`} fillOpacity={lines.length > 1 || !showLines ? 0 : 1} strokeWidth={1.5} dot={showPoints && rows.length <= 200 ? { r: 2 } : false} activeDot={showLines ? { r: 3 } : false} connectNulls={false} isAnimationActive={false} />)}
+            {lines.map((line, index) => <Area key={line.key} type="linear" dataKey={line.key} name={line.name} stroke={line.color || palette[index % palette.length]} strokeOpacity={showLines ? 1 : 0} fill={`url(#${identifier}-${line.key})`} fillOpacity={lines.length > 1 || !showLines ? 0 : 1} strokeWidth={1.5} dot={!showPoints ? false : rows.length <= 200 ? { r: 2 } : (point) => {
+              const pointIndex = point.index ?? -1;
+              return isIsolatedPoint(rows, line.key, pointIndex) && Number.isFinite(point.cx) && Number.isFinite(point.cy)
+                ? <circle key={`isolated-${pointIndex}`} cx={point.cx} cy={point.cy} r={2} fill={line.color || palette[index % palette.length]} /> : <></>;
+            }} activeDot={showLines ? { r: 3 } : false} connectNulls={false} isAnimationActive={false} />)}
           </AreaChart>
         </ResponsiveContainer>}
     </div>

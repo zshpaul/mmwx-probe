@@ -107,6 +107,12 @@ try {
   const tiedA = { ...sample("tied-a"), measured_at: sameTime, group_id: "pagination-group" };
   const tiedB = { ...sample("tied-b"), measured_at: sameTime, group_id: "pagination-group", delay_ms: 38 };
   assert.equal((await post([tiedA, tiedB])).status, 200);
+  const many = Array.from({ length: 12 }, (_, i) => ({ ...sample(`summary-${i}`), group_id: "summary-group", measured_at: sameTime, delay_ms: i }));
+  assert.equal((await post(many)).status, 200);
+  const summary = await (await fetch(`${endpoint}/api/client-latency/v1/samples?summary=1`)).json();
+  assert.equal(summary.samples.filter(item => item.group_id === "pagination-group").length, 2);
+  assert.ok(summary.samples.some(item => item.group_id === "synthetic-group"));
+  assert.deepEqual(summary.samples.filter(item => item.group_id === "summary-group").map(item => item.delay_ms), [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   const pageUrl = `${endpoint}/api/client-latency/v1/samples?paged=1&limit=1&group=pagination-group`;
   const first = await (await fetch(pageUrl)).json();
   assert.equal(first.samples.length, 1);

@@ -1,3 +1,4 @@
+import { isIsolatedPoint } from "./Trend";
 import { clientLatencyRows } from "./ClientLatency";
 import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
 import { priceCards } from "./emerald-model";
@@ -31,3 +32,8 @@ equal(bwhPrice.region_country, "US");
 equal(bwhPrice.region_city, "洛杉矶");
 equal(clientGroupPrice("group_123", true), undefined);
 equal(clientGroupPrice("other", true), undefined);
+
+const isolated = Array.from({ length: 101 }, (_, i) => ({ ...sample, measured_at: new Date(Date.parse(sample.measured_at) + i * 360_000).toISOString() }));
+const isolatedRows = clientLatencyRows(isolated);
+equal(isolatedRows.length, 201);
+equal(isolatedRows.filter((_, i) => isIsolatedPoint(isolatedRows, "latency", i)).length, 101);
