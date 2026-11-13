@@ -69,12 +69,14 @@ export async function clientLatency(request: Request, env: LatencyEnv): Promise<
     const after = url.searchParams.get("after");
     if (after !== null) {
       if (group === null || !/^\d+$/.test(after) || !Number.isSafeInteger(Number(after))) return json({ error: "invalid cursor" }, 400);
+      // Freeze the upper boundary before reading; writes after it are picked up next time.
+      const watermark = Number((await db.prepare("SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'client_latency_sequence'), 0) AS value").all()).results[0]?.value ?? 0);
       const { results } = await db.prepare(`SELECT seq.seq AS page_seq, sample.group_id, sample.group_alias, sample.node, sample.measured_at, sample.status, sample.delay_ms, sample.segment
         FROM client_latency_sequence AS seq JOIN client_latency AS sample ON sample.writer_id = seq.writer_id AND sample.id = seq.id
-        WHERE seq.seq > ? AND sample.group_id = ? AND sample.measured_ms >= ? ORDER BY seq.seq ASC LIMIT ?`)
-        .bind(Number(after), group, cutoff, limit).all();
+        WHERE seq.seq > ? AND seq.seq <= ? AND sample.group_id = ? AND sample.measured_ms >= ? ORDER BY seq.seq ASC LIMIT ?`)
+        .bind(Number(after), watermark, group, cutoff, limit).all();
       const last = results[results.length - 1] as Record<string, unknown> | undefined;
-      const next_after = last ? Number(last.page_seq) : Number(after);
+      const next_after = results.length === limit && last ? Number(last.page_seq) : Math.max(Number(after), watermark);
       const samples = results.map(({ page_seq: _seq, ...sample }) => sample);
       return json({ version: 1, samples, next_after, has_more: results.length === limit });
     }
