@@ -1,9 +1,14 @@
 import { visitorResponse } from "./visitor";
+import { clientLatency } from "./client-latency";
+import { clientQuota } from "./client-quota";
+import { clientRate } from "./client-rate";
 
 interface Env {
   ASSETS: Fetcher;
   MMWX_ORIGIN: string;
   PROBE_TOKEN: string;
+  CLIENT_LATENCY_DB?: D1Database;
+  CLIENT_LATENCY_TOKEN?: string;
 }
 
 const routes: Record<string, string> = {
@@ -112,8 +117,17 @@ function fromOwnPage(request: Request, self: string): boolean {
 }
 
 export default {
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    if (env.CLIENT_LATENCY_DB) {
+      await env.CLIENT_LATENCY_DB.prepare("DELETE FROM client_latency WHERE measured_ms < ?")
+        .bind(Date.now() - 30 * 86400_000).run();
+    }
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const incoming = new URL(request.url);
+    if (incoming.pathname === "/api/client-latency/v1/samples") return clientLatency(request, env);
+    if (incoming.pathname === "/api/client-quota/v1/snapshot") return clientQuota(request, env);
+    if (incoming.pathname === "/api/client-rate/v1/snapshot") return clientRate(request, env);
     if (incoming.pathname === "/api/visitor") return visitorResponse(request);
     if (incoming.pathname === "/login") {
       return Response.redirect(

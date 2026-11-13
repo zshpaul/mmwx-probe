@@ -4,6 +4,10 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-07-31",
   "keep_vars": true,
+  "triggers": { "crons": ["0 3 * * *"] },
+  "d1_databases": [
+    { "binding": "CLIENT_LATENCY_DB", "database_name": "mmwx-probe-client-telemetry", "database_id": "f0ccb063-f5be-4ad7-a84c-f2f5707f42ed", "migrations_dir": "migrations" }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

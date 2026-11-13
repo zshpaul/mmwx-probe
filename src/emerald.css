@@ -318,3 +318,15 @@ dialog::backdrop { background: #0008; }
   footer { flex-wrap: wrap; gap: 8px; font-size: 11px; margin-top: auto; }
   footer .connection { font-size: 10px; }
 }
+.client-card { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.client-placeholder { visibility: hidden; }
+.client-segment-gap { background: transparent !important; }
+.client-dialog-note { color: var(--muted); font-size: 12px; }
+.client-list { position: relative; z-index: 2; display: grid; gap: 8px; margin-bottom: 12px; }
+.client-list-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: inherit; text-align: left; cursor: pointer; }
+.client-list-row > span:first-child { display: flex; align-items: center; gap: 8px; }
+.client-list-row small { color: var(--muted); }
+
+/* Keep the decorative globe behind opaque cards in either theme. */
+.servers.grid .server-card { background: color-mix(in oklab, var(--background) 60%, var(--bg)); }
+.servers.grid .server-card:hover { background: var(--background); }

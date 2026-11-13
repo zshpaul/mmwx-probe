@@ -10,7 +10,7 @@ export function OsIcon({ os }: { os?: string }) {
   const icon = [siAlpinelinux, siArchlinux, siCentos, siDebian, siFedora, siRockylinux, siUbuntu].find(icon => name.includes(icon.title.toLowerCase().split(" ")[0])) || (name.includes("linux") ? siLinux : undefined);
   return <span className="os-icon" title={os}>{icon ? <svg viewBox="0 0 24 24" width="16" height="16" role="img" aria-label={os}><path fill={`#${icon.hex}`} d={icon.path} /></svg> : <Monitor size={16} aria-label={os} />}</span>;
 }
-export function RegionFlag({ server }: { server: ProbeServer }) {
+export function RegionFlag({ server }: { server: Partial<ProbeServer> }) {
   const code = [server.region_country, server.region, extractRegionFromNodeName(server.name || "")?.countryCode].find(code => code && /^[a-z]{2}$/i.test(code));
   if (!code) return null;
   const file = [...code.toUpperCase()].map(character => (character.charCodeAt(0) + 127397).toString(16)).join("-");

@@ -7,7 +7,12 @@ const signalPalette = ["var(--lime)", "var(--green)", "var(--purple)", "var(--or
 const timeLabel = (time: number) => new Date(time * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 const fullTime = (time: number) => new Date(time * 1000).toLocaleString("zh-CN", { hour12: false });
 
-export default function Trend({ title, summary, unit, rows, lines, loading, error, domain, lossMarkers = [], showLines = true, lossKeys, hideHeading = false }: {
+export function isIsolatedPoint(rows: Record<string, number | null>[], key: string, index: number) {
+  const present = (i: number) => typeof rows[i]?.[key] === "number" && Number.isFinite(rows[i][key]);
+  return present(index) && !present(index - 1) && !present(index + 1);
+}
+
+export default function Trend({ title, summary, unit, rows, lines, loading, error, domain, lossMarkers = [], showLines = true, lossKeys, hideHeading = false, timeScale = false, showPoints = false }: {
   title: string;
   summary?: string;
   unit: string;
@@ -20,6 +25,8 @@ export default function Trend({ title, summary, unit, rows, lines, loading, erro
   showLines?: boolean;
   lossKeys?: Record<string, string>;
   hideHeading?: boolean;
+  timeScale?: boolean;
+  showPoints?: boolean;
 }) {
   const identifier = useId().replaceAll(":", "");
   const hasValues = lossMarkers.length > 0 || rows.some(row => lines.some(line => row[line.key] !== null && row[line.key] !== undefined));
@@ -34,7 +41,7 @@ export default function Trend({ title, summary, unit, rows, lines, loading, erro
           <AreaChart data={rows} margin={{ left: -4, right: 12, top: 30, bottom: 0 }} accessibilityLayer>
             <defs>{lines.map((line, index) => <linearGradient key={line.key} id={`${identifier}-${line.key}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={line.color || palette[index % palette.length]} stopOpacity={.25} /><stop offset="1" stopColor={line.color || palette[index % palette.length]} stopOpacity={.02} /></linearGradient>)}</defs>
             <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="time" tickFormatter={timeLabel} tick={{ fontSize: 10, fill: "var(--muted)" }} minTickGap={16} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+            <XAxis dataKey="time" type={timeScale ? "number" : "category"} domain={timeScale ? ["dataMin", "dataMax"] : undefined} tickFormatter={timeLabel} tick={{ fontSize: 10, fill: "var(--muted)" }} minTickGap={16} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
             <YAxis domain={domain || [0, "auto"]} tickCount={6} tick={({ x, y, payload }) => <text x={x} y={y} dy={3} textAnchor="end" fill="var(--muted)" fontSize={11}>{formatValue(Number(payload.value))}</text>} axisLine={false} tickLine={false} />
             <Tooltip filterNull={!lossKeys} content={lossKeys ? ({ active, label }) => {
               const row = rows.find(row => row.time === Number(label));
@@ -46,7 +53,11 @@ export default function Trend({ title, summary, unit, rows, lines, loading, erro
             }} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12 }} />
             {lines.length > 1 && <Legend iconSize={10} iconType="square" wrapperStyle={{ fontSize: 10 }} formatter={value => <span style={{ color: "var(--muted)" }}>{value}</span>} />}
             {lossMarkers.map((marker, index) => <ReferenceLine key={`${marker.time}-${index}`} x={marker.time} stroke={marker.color} strokeOpacity={.55} strokeWidth={1} />)}
-            {lines.map((line, index) => <Area key={line.key} type="linear" dataKey={line.key} name={line.name} stroke={line.color || palette[index % palette.length]} strokeOpacity={showLines ? 1 : 0} fill={`url(#${identifier}-${line.key})`} fillOpacity={lines.length > 1 || !showLines ? 0 : 1} strokeWidth={1.5} dot={false} activeDot={showLines ? { r: 3 } : false} connectNulls={false} isAnimationActive={false} />)}
+            {lines.map((line, index) => <Area key={line.key} type="linear" dataKey={line.key} name={line.name} stroke={line.color || palette[index % palette.length]} strokeOpacity={showLines ? 1 : 0} fill={`url(#${identifier}-${line.key})`} fillOpacity={lines.length > 1 || !showLines ? 0 : 1} strokeWidth={1.5} dot={!showPoints ? false : rows.length <= 200 ? { r: 2 } : (point) => {
+              const pointIndex = point.index ?? -1;
+              return isIsolatedPoint(rows, line.key, pointIndex) && Number.isFinite(point.cx) && Number.isFinite(point.cy)
+                ? <circle key={`isolated-${pointIndex}`} cx={point.cx} cy={point.cy} r={2} fill={line.color || palette[index % palette.length]} /> : <></>;
+            }} activeDot={showLines ? { r: 3 } : false} connectNulls={false} isAnimationActive={false} />)}
           </AreaChart>
         </ResponsiveContainer>}
     </div>
