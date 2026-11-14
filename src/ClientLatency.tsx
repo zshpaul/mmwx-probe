@@ -4,6 +4,7 @@ import { requestJson } from "./request-json";
 import { PingPanels, PingSummaryLayout } from "./EmeraldPing";
 import { bwhUsGroupId } from "./client-latency-prices";
 import type { RatePresence } from "./client-rate";
+import { detailRanges, type DetailRange } from "./emerald-model";
 const Trend = lazy(() => import("./Trend"));
 
 export type ClientSample = {
@@ -16,6 +17,14 @@ export type ClientSample = {
   segment: string;
 };
 export type ClientGroup = { id: string; alias: string; samples: ClientSample[] };
+
+export function clientLatencyInRange(samples: ClientSample[], range: DetailRange, now: number) {
+  const start = now - Number.parseInt(range, 10) * 3600_000;
+  return samples.filter(sample => {
+    const time = Date.parse(sample.measured_at);
+    return time >= start && time <= now;
+  });
+}
 
 export type ClientPresence = "online" | "offline" | "unknown";
 export function clientPresence(group: ClientGroup, _now: number, _available: boolean, rate: RatePresence): ClientPresence {
@@ -115,6 +124,8 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
   useEffect(() => { const element = dialog.current; element?.showModal(); return () => element?.close(); }, []);
   const [history, setHistory] = useState<ClientSample[]>();
   const [historyError, setHistoryError] = useState<string>();
+  const [range, setRange] = useState<DetailRange>("1h");
+  const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -161,7 +172,7 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
         if (active) setHistoryError(undefined);
       } catch {
         if (active) setHistoryError("正在重试");
-      } finally { loading = false; }
+      } finally { if (active) setNow(Date.now()); loading = false; }
     };
     void load();
     const timer = setInterval(() => void load(), 60_000);
@@ -172,7 +183,8 @@ export function ClientLatencyDialog({ group, onClose }: { group: ClientGroup; on
     <div className="dialog-heading"><h2>{group.alias} · 客户端代理延迟</h2><button className="icon-button" aria-label="关闭客户端延迟详情" onClick={onClose}><X size={18} /></button></div>
     <p className="client-dialog-note">Windows 客户端 URLTest · 近 30 天；读取时选中节点：{latest?.node || "未公开或未知"}。测速发生时是否选中无法确认。</p>
     <p className="client-dialog-note">最近测量：{measuredTime(latest)} · {status(latest)}。切换、失败或缺测处断开。</p>
+    <div className="ping-history-tools"><div className="range-selector" role="group" aria-label="延迟历史时间范围">{detailRanges.map(option => <button key={option} aria-pressed={range === option} onClick={() => { setRange(option); setNow(Date.now()); }}>{option.toUpperCase()}</button>)}</div></div>
     {history && historyError && <p className="client-dialog-note">显示上次数据 · 正在重试</p>}
-    <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(history || [])} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={history ? undefined : historyError} timeScale showPoints /></Suspense>
+    <Suspense fallback={<div className="chart-empty">正在加载图表…</div>}><Trend title="延迟" unit="ms" rows={clientLatencyRows(clientLatencyInRange(history || [], range, now))} lines={[{ key: "latency", name: "URLTest", color: "#4ECDC4" }]} loading={!history && !historyError} error={history ? undefined : historyError} timeScale showPoints /></Suspense>
   </dialog>;
 }

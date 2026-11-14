@@ -1,5 +1,5 @@
 import { isIsolatedPoint } from "./Trend";
-import { clientLatencyRows, clientPresence, ClientLatencyList } from "./ClientLatency";
+import { clientLatencyInRange, clientLatencyRows, clientPresence, ClientLatencyDialog, ClientLatencyList } from "./ClientLatency";
 import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
 import { readRateSnapshot } from "./client-rate";
 import { priceCards } from "./emerald-model";
@@ -25,6 +25,25 @@ equal(rows[1].latency, 60);
 equal(rows[2].latency, null); // segment change
 equal(rows[4].latency, null); // failed measurement
 equal(rows[5].latency, null); // long missing interval
+
+const rangeNow = Date.parse("2026-11-14T00:00:00Z");
+const at = (offset: number) => ({ ...sample, measured_at: new Date(rangeNow + offset).toISOString() });
+const rangeSamples = [at(-24 * 3600_000 - 1), at(-24 * 3600_000), at(-12 * 3600_000), at(-6 * 3600_000), at(-3600_000 - 1), at(-3600_000), at(0), at(1), { ...sample, measured_at: "invalid" }];
+for (const [range, expected] of [["1h", 2], ["6h", 4], ["12h", 5], ["24h", 6]] as const) {
+  equal(clientLatencyInRange(rangeSamples, range, rangeNow).length, expected);
+}
+equal(clientLatencyInRange([at(-3600_000 - 1)], "1h", rangeNow).length, 0);
+const retainedDuringRetry = [at(-3600_000 + 30_000)];
+equal(clientLatencyInRange(retainedDuringRetry, "1h", rangeNow).length, 1);
+equal(clientLatencyInRange(retainedDuringRetry, "1h", rangeNow + 60_000).length, 0);
+const filteredGaps = clientLatencyRows(clientLatencyInRange([
+  at(-600_000), { ...at(-540_000), status: "failed", delay_ms: null }, at(-60_000), at(0),
+], "1h", rangeNow));
+equal(filteredGaps[1].latency, null);
+equal(filteredGaps[2].latency, null);
+const dialogMarkup = renderToStaticMarkup(<ClientLatencyDialog group={{ id: "g", alias: "BWH-US", samples: [] }} onClose={() => {}} />);
+for (const range of ["1H", "6H", "12H", "24H"]) equal(dialogMarkup.includes(`>${range}</button>`), true);
+equal(dialogMarkup.includes('aria-pressed="true">1H</button>'), true);
 
 const bwhPrice = clientGroupPrice(bwhUsGroupId, false)!;
 const demoCards = priceCards(bwhPrice, Date.parse("2027-11-09T16:00:00Z"));
