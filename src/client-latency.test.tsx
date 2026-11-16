@@ -106,11 +106,12 @@ equal(readRateSnapshot(independentRate, 0, configured.id).presence.state, "onlin
 let rejectedWrongGroup = false;
 try { readRateSnapshot(independentRate, 0, bwhUsGroupId); } catch { rejectedWrongGroup = true; }
 equal(rejectedWrongGroup, true);
-const configuredMarkup = renderToStaticMarkup(<ServerCard group={noLatency} clientState="online" hasClientRate rate={{ observed_at: "2026-11-13T00:09:59Z", upload_bps: 1024, download_bps: 2048 }} index={0} now={now} onPing={() => {}} />);
+const configuredMarkup = renderToStaticMarkup(<ServerCard group={noLatency} clientState="online" hasClientRate showUnknownQuota rate={{ observed_at: "2026-11-13T00:09:59Z", upload_bps: 1024, download_bps: 2048 }} index={0} now={now} onPing={() => {}} />);
 equal(configuredMarkup.includes("new group"), true);
 equal(configuredMarkup.includes("CNY / 年"), false);
 equal(configuredMarkup.includes("1 KB/s"), true);
 equal(configuredMarkup.includes("2 KB/s"), true);
+equal(configuredMarkup.includes(">未知</p>"), true);
 const quotaMarkup = renderToStaticMarkup(<ServerCard group={noLatency} quota={quota} index={0} now={now} onPing={() => {}} />);
 equal(quotaMarkup.includes("3 KB / 8 KB"), true);
 equal(quotaMarkup.includes("上传 1 KB"), true);

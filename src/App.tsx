@@ -25,7 +25,7 @@ export const designAttribution = "Emerald React adaptation for MMWX Probe; see /
 function Usage({ label, value, quantity, title, empty = false }: { label: string; value?: number; quantity?: string; title?: string; empty?: boolean }) {
   return <div className="usage" title={title}><div><span>{label}</span>{!empty && <strong>{percent(value)}</strong>}</div><div className="track">{!empty && <i className={value !== undefined && value >= 90 ? "danger" : value !== undefined && value >= 60 ? "warning" : ""} style={{ width: `${Math.min(100, Math.max(0, value ?? 0))}%` }} />}</div>{empty ? <p className="resource-quantity" aria-hidden="true">&nbsp;</p> : quantity && <p className="resource-quantity">{quantity}</p>}</div>;
 }
-export function ServerCard({ server, group, quota, rate, index, now, tri, onPing, clientState, hasClientRate = false, quotaMode = "both" }: { server?: ProbeServer; group?: ClientGroup; quota?: ClientQuota; rate?: ClientRate; index: number; now: number; tri?: ProbePayload["tri_isp"]; onPing: () => void; clientState?: ClientPresence; hasClientRate?: boolean; quotaMode?: QuotaMode }) {
+export function ServerCard({ server, group, quota, rate, index, now, tri, onPing, clientState, hasClientRate = false, quotaMode = "both", showUnknownQuota = false }: { server?: ProbeServer; group?: ClientGroup; quota?: ClientQuota; rate?: ClientRate; index: number; now: number; tri?: ProbePayload["tri_isp"]; onPing: () => void; clientState?: ClientPresence; hasClientRate?: boolean; quotaMode?: QuotaMode; showUnknownQuota?: boolean }) {
   const traffic = server ? billableTraffic(server) : undefined;
   const localPreview = typeof location !== "undefined" && ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("preview");
   const groupPrice = group ? clientGroupPrice(group.id, localPreview) : undefined;
@@ -44,7 +44,7 @@ export function ServerCard({ server, group, quota, rate, index, now, tri, onPing
       {(group || (server && isNumber(server.cpu_pct))) && <Usage label="CPU" empty={!!group && !placeholders} value={placeholders ? 0 : server?.cpu_pct} quantity={server ? loadAverage(server.loadavg) : undefined} title={placeholders ? "占位值，非实测" : server?.loadavg} />}
       {(group || (server && (isNumber(server.mem_used) || isNumber(server.mem_total)))) && <Usage label="内存" empty={!!group && !placeholders} value={placeholders ? 0 : server && ratio(server.mem_used, server.mem_total)} quantity={placeholders ? "0 B / 0 B" : server && `${bytes(server.mem_used)} / ${bytes(server.mem_total)}`} title={placeholders ? "占位值，非实测" : undefined} />}
       {(group || (server && (isNumber(server.disk_used) || isNumber(server.disk_total)))) && <Usage label="硬盘" empty={!!group && !placeholders} value={placeholders ? 0 : server && ratio(server.disk_used, server.disk_total)} quantity={placeholders ? "0 B / 0 B" : server && `${bytes(server.disk_used)} / ${bytes(server.disk_total)}`} title={placeholders ? "占位值，非实测" : undefined} />}
-      {(group || (server && isNumber(traffic))) && <Usage label="流量" empty={!!group && !quota} value={group ? ratio(clientTraffic.used, clientTraffic.total) : server && ratio(traffic, server.traffic_limit)} quantity={group ? clientTrafficText : server && `${bytes(traffic)}${isNumber(server.traffic_limit) && server.traffic_limit > 0 ? ` / ${bytes(server.traffic_limit)}` : ""}`} title={group ? clientTrafficTitle : server && trafficUsageLabel(server)} />}
+      {(group || (server && isNumber(traffic))) && <Usage label="流量" empty={!!group && !quota && !showUnknownQuota} value={group ? ratio(clientTraffic.used, clientTraffic.total) : server && ratio(traffic, server.traffic_limit)} quantity={group ? clientTrafficText ?? (showUnknownQuota ? "未知" : undefined) : server && `${bytes(traffic)}${isNumber(server.traffic_limit) && server.traffic_limit > 0 ? ` / ${bytes(server.traffic_limit)}` : ""}`} title={group ? clientTrafficTitle : server && trafficUsageLabel(server)} />}
     </div>
     <div className="card-facts">
       {offline && <div className="offline-overlay"><strong>离线</strong>{server?.last_seen && <span>{new Date(server.last_seen).toLocaleString("zh-CN", { hour12: false })}</span>}{group && <button className="offline-history" onClick={event => { event.stopPropagation(); onPing(); }}>查看历史</button>}</div>}
@@ -70,7 +70,7 @@ function ConfiguredClient({ config, sampleGroup, view, available, now, search }:
   if (!config.alias.toLowerCase().includes(search.toLowerCase())) return null;
   return <>
     {view === "list" ? <ClientLatencyList groups={[group]} available={available} now={now} ratePresence={presence} onOpen={() => setOpen(true)} scopedRate /> :
-      <ServerCard group={group} quota={quota} quotaMode={config.quotaMode} rate={rate} clientState={presence.state} hasClientRate index={0} now={now} onPing={() => setOpen(true)} />}
+      <ServerCard group={group} quota={quota} quotaMode={config.quotaMode} rate={rate} clientState={presence.state} hasClientRate showUnknownQuota index={0} now={now} onPing={() => setOpen(true)} />}
     {open && <ClientLatencyDialog group={group} onClose={() => setOpen(false)} />}
   </>;
 }
