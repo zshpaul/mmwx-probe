@@ -28,10 +28,18 @@ isolation; test the installed client's handling and refresh behavior; prepare
 backup and rollback; and obtain review of the exact change. Do not enable
 DMIT quota upload based solely on this prototype.
 
-A separate synthetic nginx fixture demonstrated that an exact location routes
-an encoded known path by its normalized value while the upstream receives the
-original request target. With an exact-only route, a rotated or double-encoded
-path can instead fall through to the panel and expose its aggregate header.
+The opt-in `test_nginx_fixture` runs nginx together with this actual overlay and
+synthetic upstreams. It demonstrates that an exact location routes an encoded
+known path by its normalized value while the overlay receives the original
+request target. With an exact-only route, a rotated or double-encoded path can
+instead fall through to the panel and expose its aggregate header. The fixture
+asserts this negative result to prevent mistaking it for a safe route.
+
+A potential alternative routes a finite subscription path family through an
+authoritative, dynamically refreshed identity dispatcher and rejects ambiguous
+encodings. This is not implemented: if the mapping cannot be read, failing
+closed for unknown rotated DMIT paths also affects otherwise ordinary
+subscriptions in that family, because their identities cannot be distinguished.
 The single-layer matching change does not solve that routing failure; no nginx
 configuration in this repository is approved for production.
 
