@@ -1,0 +1,29 @@
+name: Subscription bridge tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - integrations/mmwx-subscription-headers/**
+      - .github/workflows/subscription-bridge.yml
+  pull_request:
+    paths:
+      - integrations/mmwx-subscription-headers/**
+      - .github/workflows/subscription-bridge.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/mmwx-subscription-headers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install cryptography==43.0.0
+      - run: python -m unittest -v test_bridge_core test_overlay test_dispatcher
