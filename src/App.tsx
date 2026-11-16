@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Activity, ArrowUp, ChevronDown, ChevronUp, LayoutGrid, Monitor, Moon, Search, Server, Sun, Table2 } from "lucide-react";
 import { useProbe, applyAppearance, saveColorModePreference, readColorModePreference } from "./use-probe";
 import { nextColorMode } from "./theme-preference";
@@ -16,7 +16,7 @@ import { loadAverage } from "./telemetry-display";
 import { ClientLatencyDialog, ClientLatencyList, ClientLatencySummary, clientPresence, useClientLatency, type ClientGroup, type ClientPresence } from "./ClientLatency";
 import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
 import { quotaUsage, useClientQuota, type ClientQuota, type QuotaMode } from "./client-quota";
-import { useClientRate, type ClientRate } from "./client-rate";
+import { useClientRate, type ClientRate, type RatePresence } from "./client-rate";
 
 // Populate only after a client identity has been persisted and verified.
 export const configuredClientGroups: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode }> = [];
@@ -61,18 +61,19 @@ export function configuredClientGroup(config: { id: string; alias: string }, sam
   if (!sampleGroup && !quota && !observedAt) return undefined;
   return { id: config.id, alias: config.alias, samples: sampleGroup?.samples ?? [] };
 }
-function ConfiguredClient({ config, sampleGroup, view, available, now, search }: { config: { id: string; alias: string; quotaMode: QuotaMode }; sampleGroup?: ClientGroup; view: string; available: boolean; now: number; search: string }) {
-  const quota = useClientQuota(config.id);
-  const { rate, presence } = useClientRate(config.id);
-  const [open, setOpen] = useState(false);
-  const group = configuredClientGroup(config, sampleGroup, quota, presence.observedAt);
-  if (!group) return null;
-  if (!config.alias.toLowerCase().includes(search.toLowerCase())) return null;
-  return <>
-    {view === "list" ? <ClientLatencyList groups={[group]} available={available} now={now} ratePresence={presence} onOpen={() => setOpen(true)} scopedRate /> :
-      <ServerCard group={group} quota={quota} quotaMode={config.quotaMode} rate={rate} clientState={presence.state} hasClientRate showUnknownQuota index={0} now={now} onPing={() => setOpen(true)} />}
-    {open && <ClientLatencyDialog group={group} onClose={() => setOpen(false)} />}
-  </>;
+type ConfiguredSnapshot = { quota?: ClientQuota; rate?: ClientRate; presence: RatePresence };
+export function availableConfiguredGroups(configs: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode }>, samples: ClientGroup[], snapshots: Record<string, ConfiguredSnapshot>) {
+  return configs.flatMap(config => {
+    const snapshot = snapshots[config.id];
+    const group = configuredClientGroup(config, samples.find(item => item.id === config.id), snapshot?.quota, snapshot?.presence.observedAt);
+    return group ? [{ config, group, snapshot }] : [];
+  });
+}
+function ConfiguredClientPoller({ id, onUpdate }: { id: string; onUpdate: (id: string, snapshot: ConfiguredSnapshot) => void }) {
+  const quota = useClientQuota(id);
+  const { rate, presence } = useClientRate(id);
+  useEffect(() => { onUpdate(id, { quota, rate, presence }); }, [id, quota, rate, presence, onUpdate]);
+  return null;
 }
 function selectedIndex() {
   const match = location.hash.match(/^#\/?server\/(\d+)$/);
@@ -90,6 +91,10 @@ export function App() {
   const [pingNode, setPingNode] = useState<number>();
   const [clientDialog, setClientDialog] = useState<string>();
   const { groups: clientGroups, available: clientAvailable, checkedAt: clientCheckedAt } = useClientLatency();
+  const [configuredSnapshots, setConfiguredSnapshots] = useState<Record<string, ConfiguredSnapshot>>({});
+  const updateConfigured = useCallback((id: string, snapshot: ConfiguredSnapshot) => {
+    setConfiguredSnapshots(previous => ({ ...previous, [id]: snapshot }));
+  }, []);
   const clientQuota = useClientQuota();
   const { rate: clientRate, presence: clientRatePresence } = useClientRate();
   const clientNow = Math.max(clientCheckedAt, Date.now());
@@ -109,10 +114,11 @@ export function App() {
   const servers = data?.servers || [];
   const visible = servers.map((server, index) => ({ server, index })).filter(({ server }) => `${server.name || ""} ${locationName(server)} ${server.os || ""}`.toLowerCase().includes(search.toLowerCase()));
   const visibleClients = clientGroups.filter(group => !configuredClientGroups.some(config => config.id === group.id)).filter(group => group.alias.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b.id === bwhUsGroupId) - Number(a.id === bwhUsGroupId));
-  const visibleConfigured = configuredClientGroups.filter(config => config.alias.toLowerCase().includes(search.toLowerCase()));
-  const selectedClient = clientGroups.find(group => group.id === clientDialog);
+  const configured = availableConfiguredGroups(configuredClientGroups, clientGroups, configuredSnapshots);
+  const visibleConfigured = configured.filter(({ config }) => config.alias.toLowerCase().includes(search.toLowerCase()));
+  const selectedClient = configured.find(({ group }) => group.id === clientDialog)?.group ?? clientGroups.find(group => group.id === clientDialog);
   const modeName = { light: "浅色主题", dark: "深色主题", system: "自动主题" }[mode];
-  return <><Background /><div className="shell">
+  return <>{configuredClientGroups.map(config => <ConfiguredClientPoller key={config.id} id={config.id} onUpdate={updateConfigured} />)}<Background /><div className="shell">
     <header className={`topbar ${scrolled ? "scrolled" : ""}`}><a className="brand" href="#"><Server size={28} /><span>ZSH</span></a><nav aria-label="页面工具"><button className="icon-button theme-button" title={`${modeName} · 点击切换`} aria-label={`${modeName}，切换主题`} onClick={() => { const next = nextColorMode(mode); setMode(next); saveColorModePreference(next); applyAppearance(data?.appearance, next); }}>{mode === "system" ? <Monitor size={18} /> : mode === "light" ? <Sun size={18} /> : <Moon size={18} />}</button></nav></header>
     {data?.local_client_only ? <div className="demo-note">本机客户端代理延迟 · 机器主控未连接；BWH-US 为本机实测，其余测试组为合成数据</div> : ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("preview") && <div className="demo-note">本地测试预览 · 主控为模拟数据；BWH-US 如出现为本机实测，其余测速组为合成测试数据</div>}
     {import.meta.env.DEV && import.meta.env.VITE_PROBE_MOCK === "1" && new URLSearchParams(location.search).has("debug") && <div className="demo-note">演示环境 · 以下为模拟节点与趋势数据</div>}
@@ -121,7 +127,7 @@ export function App() {
       <h1 className="sr-only">节点监控</h1>
       {!data.local_client_only && <FleetSummary servers={servers} visitorCountryCode={visitor?.countryCode} formatBytes={bytes} now={updatedAt ?? Date.now()} />}
       <div className="toolbar"><span className="group-tab">全部节点</span><div className="view-tools"><div className="view-switch" role="group" aria-label="显示方式"><button aria-label="卡片视图" title="卡片视图" aria-pressed={view === "grid"} onClick={() => setView("grid")}><LayoutGrid size={14} /></button><button aria-label="列表视图" title="列表视图" aria-pressed={view === "list"} onClick={() => setView("list")}><Table2 size={14} /></button></div><label className={`search ${search ? "has-value" : ""}`}><Search size={14} /><input aria-label="搜索节点" placeholder="搜索节点名称、地区、系统" value={search} onChange={event => setSearch(event.target.value)} /></label></div></div>
-      {visible.length || visibleClients.length || visibleConfigured.length ? view === "list" ? <>{visibleClients.length > 0 && <ClientLatencyList groups={visibleClients} available={clientAvailable} now={clientNow} ratePresence={clientRatePresence} onOpen={setClientDialog} />}{visibleConfigured.map(config => <ConfiguredClient key={config.id} config={config} sampleGroup={clientGroups.find(group => group.id === config.id)} view={view} available={clientAvailable} now={clientNow} search={search} />)}{visible.length > 0 && <ServerList nodes={visible} tri={data.tri_isp} onPing={setPingNode} />}</> : <div className="servers grid">{visible.slice(0, 1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}{visibleClients.map(group => <ServerCard key={`client-${group.id}`} group={group} clientState={clientPresence(group, clientNow, clientAvailable, clientRatePresence)} quota={group.id === bwhUsGroupId ? clientQuota : undefined} rate={group.id === bwhUsGroupId ? clientRate : undefined} index={0} now={updatedAt ?? Date.now()} onPing={() => setClientDialog(group.id)} />)}{visibleConfigured.map(config => <ConfiguredClient key={config.id} config={config} sampleGroup={clientGroups.find(group => group.id === config.id)} view={view} available={clientAvailable} now={clientNow} search={search} />)}{visible.slice(1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length || clientGroups.length || configuredClientGroups.length ? "没有匹配的节点或测速组" : "暂无服务器或测速组"}</h2>{search && <button onClick={() => setSearch("")}>清除搜索</button>}</div>}
+      {visible.length || visibleClients.length || visibleConfigured.length ? view === "list" ? <>{visibleClients.length > 0 && <ClientLatencyList groups={visibleClients} available={clientAvailable} now={clientNow} ratePresence={clientRatePresence} onOpen={setClientDialog} />}{visibleConfigured.map(({ config, group, snapshot }) => <ClientLatencyList key={config.id} groups={[group]} available={clientAvailable} now={clientNow} ratePresence={snapshot?.presence ?? { state: "unknown" }} onOpen={setClientDialog} scopedRate />)}{visible.length > 0 && <ServerList nodes={visible} tri={data.tri_isp} onPing={setPingNode} />}</> : <div className="servers grid">{visible.slice(0, 1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}{visibleClients.map(group => <ServerCard key={`client-${group.id}`} group={group} clientState={clientPresence(group, clientNow, clientAvailable, clientRatePresence)} quota={group.id === bwhUsGroupId ? clientQuota : undefined} rate={group.id === bwhUsGroupId ? clientRate : undefined} index={0} now={updatedAt ?? Date.now()} onPing={() => setClientDialog(group.id)} />)}{visibleConfigured.map(({ config, group, snapshot }) => <ServerCard key={config.id} group={group} quota={snapshot?.quota} quotaMode={config.quotaMode} rate={snapshot?.rate} clientState={snapshot?.presence.state ?? "unknown"} hasClientRate showUnknownQuota index={0} now={updatedAt ?? Date.now()} onPing={() => setClientDialog(group.id)} />)}{visible.slice(1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length || clientGroups.length || configuredClientGroups.length ? "没有匹配的节点或测速组" : "暂无服务器或测速组"}</h2>{search && <button onClick={() => setSearch("")}>清除搜索</button>}</div>}
     </main>}
     <VisitorInfo onVisitor={setVisitor} />
     {selectedClient && <ClientLatencyDialog group={selectedClient} onClose={() => setClientDialog(undefined)} />}

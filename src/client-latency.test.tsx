@@ -4,7 +4,7 @@ import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
 import { readRateSnapshot } from "./client-rate";
 import { quotaUsage } from "./client-quota";
 import { priceCards } from "./emerald-model";
-import { configuredClientGroup, ServerCard } from "./App";
+import { availableConfiguredGroups, configuredClientGroup, ServerCard } from "./App";
 import { renderToStaticMarkup } from "react-dom/server";
 const equal = (actual: unknown, expected: unknown) => {
   if (actual !== expected) throw new Error(`Expected ${expected}, got ${actual}`);
@@ -96,6 +96,10 @@ equal(unknownList.includes("状态未知"), true);
 // A configured identity appears only with real evidence and retains an empty history when no sample exists.
 const configured = { id: "independent", alias: "new group" };
 equal(configuredClientGroup(configured), undefined);
+const configuredEntries = [{ ...configured, quotaMode: "download" as const }];
+equal(availableConfiguredGroups(configuredEntries, [], {}).length, 0);
+equal(availableConfiguredGroups(configuredEntries, [], { [configured.id]: { presence: { state: "unknown" } } }).length, 0);
+equal(availableConfiguredGroups(configuredEntries, [], { [configured.id]: { presence: { state: "online", observedAt: "2026-11-13T00:09:59Z" } } }).length, 1);
 const noLatency = configuredClientGroup(configured, undefined, undefined, "2026-11-13T00:09:59Z")!;
 equal(noLatency.samples.length, 0);
 equal(noLatency.alias, configured.alias);
