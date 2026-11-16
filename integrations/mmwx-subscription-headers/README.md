@@ -33,3 +33,10 @@ Run the synthetic, loopback-only tests with Python and `cryptography` installed:
 ```text
 python -m unittest -v test_bridge_core test_overlay
 ```
+
+An optional `test_legacy_fixture` reads the source snapshot named by
+`LEGACY_FIXTURE_PATH` without copying it into the repository. It loads only
+imports, functions and classes, substitutes synthetic identity, keys and
+network inputs, and exercises the legacy BWH GET/HEAD handler and the legacy
+RPC transform followed by the overlay transform. It does not exercise a full
+HTTP chain or prove that the supplied snapshot matches a running deployment.
