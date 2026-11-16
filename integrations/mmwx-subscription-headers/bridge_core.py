@@ -4,7 +4,6 @@ This module does not open sockets, read production configuration, or write data.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import ipaddress
 import re
 import threading
@@ -18,7 +17,6 @@ class Mapping:
     subscription_id: int
     external_id: int
     paths: frozenset[str]
-    rpc_filename: str
 
 
 def select_mapping(path: str, mappings: list[Mapping]) -> Mapping | None:
@@ -60,23 +58,6 @@ def validate_upstream(url: str, approved_host: str, addresses: list[str]) -> Non
         raise ValueError("unapproved upstream")
     if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
         raise ValueError("upstream resolves to a non-public address")
-
-
-def update_rpc_subscription(items: object, mapping: Mapping, header: str) -> bool:
-    """Change only the configured subscription entry in an already decoded RPC."""
-    if not isinstance(items, list):
-        return False
-    fields = dict(part.split("=", 1) for part in normalize_traffic_header(header).split("; "))
-    expiry = int(fields.get("expire", "0"))
-    expires_at = datetime.fromtimestamp(expiry, timezone.utc).isoformat().replace("+00:00", "Z") if expiry else None
-    matches = [item for item in items if isinstance(item, dict)
-               and item.get("id") == mapping.subscription_id
-               and item.get("filename") == mapping.rpc_filename]
-    for item in matches:
-        item["traffic_used"] = int(fields["upload"]) + int(fields["download"])
-        item["traffic_total"] = int(fields["total"])
-        item["expire_at"] = expires_at
-    return bool(matches)
 
 
 class SourceCache:

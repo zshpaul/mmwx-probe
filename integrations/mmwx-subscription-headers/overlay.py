@@ -1,27 +1,18 @@
-"""Loopback-only DMIT-style overlay in front of an existing BWH RPC bridge.
+"""Loopback-only handler for an explicitly mapped additional subscription.
 
 All real paths, hostnames, identifiers and key locations come from a private
 configuration file. This program is not installed or started by the project.
 """
 
-import base64
 import http.client
-import json
-import os
 from pathlib import Path
 import socket
 import sqlite3
 import ssl
-import sys
 from urllib.parse import quote, urlsplit
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import x25519
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-
-from bridge_core import Mapping, SourceCache, select_mapping, update_rpc_subscription, validate_upstream
+from bridge_core import Mapping, SourceCache, select_mapping, validate_upstream
 
 MAX_BODY = 16 * 1024 * 1024
 HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -91,59 +82,19 @@ def load_records(config: dict) -> list[tuple[Mapping, str, str, str]]:
                 raise ValueError("configured record missing")
             paths = {"/x/" + code for code in codes if code}
             paths.update("/x/" + code + owner for code in codes if code for owner in (owners or ()) if owner)
-            mapping = Mapping(sid, eid, frozenset(paths), entry["rpc_filename"])
+            mapping = Mapping(sid, eid, frozenset(paths))
             result.append((mapping, external[0], external[1] or "", entry["approved_host"]))
-        # Reject duplicate paths, external identities and RPC identities.
-        seen_paths, seen_external, seen_rpc = set(), set(), set()
+        # Reject duplicate paths, external identities and subscription identities.
+        seen_paths, seen_external, seen_subscriptions = set(), set(), set()
         for mapping, _, _, _ in result:
-            rpc = (mapping.subscription_id, mapping.rpc_filename)
-            if not mapping.paths or seen_paths.intersection(mapping.paths) or mapping.external_id in seen_external or rpc in seen_rpc:
+            if not mapping.paths or seen_paths.intersection(mapping.paths) or mapping.external_id in seen_external or mapping.subscription_id in seen_subscriptions:
                 raise ValueError("ambiguous configuration")
             seen_paths.update(mapping.paths)
             seen_external.add(mapping.external_id)
-            seen_rpc.add(rpc)
+            seen_subscriptions.add(mapping.subscription_id)
         return result
     finally:
         db.close()
-
-
-def transform_rpc(request_body: bytes, response_body: bytes, private_bytes: bytes,
-                  records: list[tuple[Mapping, str, str, str]], get_header) -> bytes:
-    private = x25519.X25519PrivateKey.from_private_bytes(private_bytes)
-    master = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    public = request_body[:32]
-    shared = private.exchange(x25519.X25519PublicKey.from_public_bytes(public))
-    keys = {direction: HKDF(algorithm=hashes.SHA256(), length=32, salt=public + master,
-                            info=("mmx-secure-rpc-" + direction + "-v1").encode()).derive(shared)
-            for direction in ("c2s", "s2c")}
-    request = json.loads(ChaCha20Poly1305(keys["c2s"]).decrypt(request_body[32:44], request_body[44:], None))
-    if request.get("method", "GET") != "GET" or request.get("path") != "/subscriptions":
-        return response_body
-    response = json.loads(ChaCha20Poly1305(keys["s2c"]).decrypt(response_body[:12], response_body[12:], None))
-    if not isinstance(response, dict) or not isinstance(response.get("subscriptions"), list):
-        return response_body
-    changed = False
-    for record in records:
-        mapping = record[0]
-        items = response["subscriptions"]
-        matched = [item for item in items if isinstance(item, dict)
-                   and item.get("id") in (mapping.subscription_id, str(mapping.subscription_id))]
-        if matched:
-            try:
-                if any(type(item.get("id")) is not int or item.get("filename") != mapping.rpc_filename for item in matched):
-                    raise ValueError("subscription identity changed")
-                changed = update_rpc_subscription(items, mapping, get_header(record)) or changed
-            except Exception:
-                # Do not leave an unrelated aggregate quota on this entry.
-                for item in matched:
-                    item["traffic_used"] = None
-                    item["traffic_total"] = None
-                    item["expire_at"] = None
-                changed = True
-    if not changed:
-        return response_body
-    nonce = os.urandom(12)
-    return nonce + ChaCha20Poly1305(keys["s2c"]).encrypt(nonce, json.dumps(response, ensure_ascii=False).encode(), None)
 
 
 class Overlay:
@@ -214,45 +165,4 @@ def make_handler(overlay: Overlay):
             except Exception:
                 self.send_error(502, "subscription unavailable")
 
-        def do_POST(self):
-            if self.path != "/api/secure/rpc":
-                self.send_error(404)
-                return
-            try:
-                length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 1024 * 1024:
-                    self.send_error(413)
-                    return
-                body = self.rfile.read(length)
-                headers = {key: value for key, value in self.headers.items() if key.lower() not in HOP_HEADERS}
-                headers["Accept-Encoding"] = "identity"
-                status, response_headers, payload = overlay.forward(overlay.config["bwh_bridge_port"], "POST", self.path, headers, body)
-                if status == 200:
-                    try:
-                        key = base64.b64decode(Path(overlay.config["rpc_key_file"]).read_bytes(), validate=True)
-                        payload = transform_rpc(body, payload, key, load_records(overlay.config), overlay.header)
-                    except Exception:
-                        # An unverifiable response could contain an aggregate
-                        # incorrectly attributed to the additional subscription.
-                        self.send_error(502, "RPC transformation unavailable")
-                        return
-                self.send_payload(status, response_headers, payload)
-            except Exception:
-                self.send_error(502, "RPC unavailable")
-
     return Handler
-
-
-def main():
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: overlay.py PRIVATE_CONFIG")
-    with open(sys.argv[1], encoding="utf8") as source:
-        config = json.load(source)
-    overlay = Overlay(config)
-    # Validate mappings before opening the loopback listener.
-    load_records(config)
-    ThreadingHTTPServer(("127.0.0.1", int(config["listen_port"])), make_handler(overlay)).serve_forever()
-
-
-if __name__ == "__main__":
-    main()

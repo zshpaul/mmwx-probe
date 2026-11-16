@@ -1,19 +1,19 @@
 import unittest
 import threading
 
-from bridge_core import Mapping, SourceCache, normalize_traffic_header, select_mapping, update_rpc_subscription, validate_upstream
+from bridge_core import Mapping, SourceCache, normalize_traffic_header, select_mapping, validate_upstream
 
 
 class BridgeCoreTests(unittest.TestCase):
     def setUp(self):
-        self.first = Mapping(1, 11, frozenset({"/first"}), "first.yaml")
-        self.second = Mapping(2, 22, frozenset({"/second"}), "second.yaml")
+        self.first = Mapping(1, 11, frozenset({"/first"}))
+        self.second = Mapping(2, 22, frozenset({"/second"}))
 
     def test_exact_paths_and_ambiguity(self):
         self.assertEqual(select_mapping("/first", [self.first, self.second]), self.first)
         self.assertIsNone(select_mapping("/first/extra", [self.first, self.second]))
         with self.assertRaises(ValueError):
-            select_mapping("/first", [self.first, Mapping(3, 33, self.first.paths, "third.yaml")])
+            select_mapping("/first", [self.first, Mapping(3, 33, self.first.paths)])
 
     def test_header_preserves_directions_and_rejects_bad_input(self):
         self.assertEqual(normalize_traffic_header("upload=2; download=3; total=20; expire=0"),
@@ -54,15 +54,6 @@ class BridgeCoreTests(unittest.TestCase):
             first.join(2)
             if second.ident is not None:
                 second.join(2)
-
-    def test_rpc_only_updates_exact_id_and_filename(self):
-        items = [{"id": 1, "filename": "first.yaml", "traffic_used": 8},
-                 {"id": 2, "filename": "second.yaml", "traffic_used": 9}]
-        self.assertTrue(update_rpc_subscription(items, self.second, "upload=2;download=3;total=20;expire=1700000000"))
-        self.assertEqual(items[0]["traffic_used"], 8)
-        self.assertEqual(items[1]["traffic_used"], 5)
-        self.assertEqual(items[1]["traffic_total"], 20)
-        self.assertEqual(items[1]["expire_at"], "2023-11-14T22:13:20Z")
 
     def test_upstream_requires_approved_host_and_public_addresses(self):
         validate_upstream("https://example.org/path", "example.org", ["8.8.8.8"])
