@@ -7,10 +7,10 @@ type RateResponse = {
   version: number; expires_in_ms: number;
   snapshot: { group_id: string; observed_at: string; status: string; upload_bps: number | null; download_bps: number | null } | null;
 };
-export function readRateSnapshot(value: RateResponse, elapsed: number): { presence: RatePresence; rate?: ClientRate; remaining: number } {
+export function readRateSnapshot(value: RateResponse, elapsed: number, groupId = bwhUsGroupId): { presence: RatePresence; rate?: ClientRate; remaining: number } {
   const sample = value.snapshot;
   if (value.version !== 1 || !Number.isFinite(value.expires_in_ms) || value.expires_in_ms < 0 ||
-      (sample !== null && (sample?.group_id !== bwhUsGroupId || !Number.isFinite(Date.parse(sample.observed_at)) ||
+      (sample !== null && (sample?.group_id !== groupId || !Number.isFinite(Date.parse(sample.observed_at)) ||
       !((sample.status === "ok" && Number.isSafeInteger(sample.upload_bps) && Number.isSafeInteger(sample.download_bps) &&
         sample.upload_bps! >= 0 && sample.download_bps! >= 0) ||
         (sample.status === "unknown" && sample.upload_bps === null && sample.download_bps === null))))) throw new Error("invalid response");
@@ -22,7 +22,7 @@ export function readRateSnapshot(value: RateResponse, elapsed: number): { presen
     remaining,
   };
 }
-export function useClientRate(): { rate?: ClientRate; presence: RatePresence } {
+export function useClientRate(groupId = bwhUsGroupId): { rate?: ClientRate; presence: RatePresence } {
   const [rate, setRate] = useState<ClientRate>();
   const [presence, setPresence] = useState<RatePresence>({ state: "unknown" });
   useEffect(() => {
@@ -36,11 +36,11 @@ export function useClientRate(): { rate?: ClientRate; presence: RatePresence } {
       const started = performance.now();
       reachable = false;
       try {
-        const response = await fetch(`/api/client-rate/v1/snapshot?group_id=${encodeURIComponent(bwhUsGroupId)}`, { signal: controller.signal, cache: "no-store" });
+        const response = await fetch(`/api/client-rate/v1/snapshot?group_id=${encodeURIComponent(groupId)}`, { signal: controller.signal, cache: "no-store" });
         if (!response.ok) throw new Error("request failed");
         const value = await response.json() as RateResponse;
         if (!active || requestNumber !== sequence) return;
-        const result = readRateSnapshot(value, performance.now() - started);
+        const result = readRateSnapshot(value, performance.now() - started, groupId);
         reachable = true;
         if (expiry) clearTimeout(expiry);
         setPresence(result.presence);
@@ -59,6 +59,6 @@ export function useClientRate(): { rate?: ClientRate; presence: RatePresence } {
     void load();
     const timer = setInterval(() => void load(), 5_000);
     return () => { active = false; controller.abort(); clearInterval(timer); if (expiry) clearTimeout(expiry); };
-  }, []);
+  }, [groupId]);
   return { rate, presence };
 }
