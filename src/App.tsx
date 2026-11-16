@@ -20,7 +20,7 @@ import { useClientRate, type ClientRate, type RatePresence } from "./client-rate
 
 // Populate only after a client identity has been persisted and verified.
 export const configuredClientGroups: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode; quotaEnabled?: boolean }> = [
-  { id: dmitUsGroupId, alias: "dmitus", quotaMode: "both", quotaEnabled: false },
+  { id: dmitUsGroupId, alias: "DMIT-US", quotaMode: "both", quotaEnabled: false },
 ];
 
 export const designAttribution = "Emerald React adaptation for MMWX Probe; see /THIRD_PARTY_NOTICES.txt.";

@@ -20,7 +20,7 @@ export function clientGroupDateRemaining(date: string, now: number): PriceCard |
   const days = (target - today) / 86400000;
   return {
     label: "剩余时间",
-    value: days < 0 ? `${date}（已过到期日）` : days === 0 ? `${date}（到期日）` : `${days} 天 · ${date}`,
+    value: days < 0 ? "已到期" : `${days} 天`,
     tone: days > 7 ? "positive" : "warning",
     title: `到期日期：${date}（具体时间未知）`,
   };
@@ -42,6 +42,9 @@ const clientGroupPrices: Record<string, ClientGroupPrice> = {
     renewal_price_cny: 120,
     renewal_cycle: "year",
     expiry_date: "2027-11-21",
+    region_country: "US",
+    region_name: "美国",
+    region_city: "洛杉矶",
   },
 };
 
