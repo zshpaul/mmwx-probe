@@ -55,9 +55,9 @@ equal(bwhPrice.region_country, "US");
 equal(bwhPrice.region_city, "洛杉矶");
 equal(clientGroupPrice("group_123", true), undefined);
 equal(clientGroupPrice("other", true), undefined);
-equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T15:59:59Z"))?.value, "1");
-equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T16:00:00Z"))?.value, "到期日");
-equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-21T16:00:00Z"))?.value, "已过到期日");
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T15:59:59Z"))?.value, "1 天 · 2027-11-21");
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T16:00:00Z"))?.value, "2027-11-21（到期日）");
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-21T16:00:00Z"))?.value, "2027-11-21（已过到期日）");
 equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T16:00:00Z"))?.title, "到期日期：2027-11-21（具体时间未知）");
 equal(clientGroupDateRemaining("2027-02-30", Date.now()), undefined);
 
