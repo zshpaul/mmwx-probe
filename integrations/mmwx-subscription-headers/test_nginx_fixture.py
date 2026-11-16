@@ -36,11 +36,6 @@ class NginxFixtureTests(unittest.TestCase):
         config.update({"panel_host_header": "example.org", "panel_port": 1111, "bwh_bridge_port": 2222})
         instance = overlay.Overlay(config)
         instance.header = lambda _: "upload=2; download=3; total=20"
-        def forward(port, method, target, headers):
-            if target == "/x/ordinary?redirect=1":
-                return (307, [("Location", "/x/dmit")], b"")
-            return (200, [("Subscription-Userinfo", "legacy-bwh" if port == 2222 else "aggregate-fixture")], b"config")
-        instance.forward = forward
         server = overlay.ThreadingHTTPServer(("127.0.0.1", 0), dispatcher.make_dispatch_handler(overlay, instance))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -51,13 +46,45 @@ class NginxFixtureTests(unittest.TestCase):
         # An upstream fixture represents the normal X catch-all, without data.
         class Panel(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
+                if self.path == "/x/ordinary?redirect=1":
+                    self.send_response(307)
+                    self.send_header("Location", "/x/dmit")
+                    self.end_headers()
+                    return
                 self.send_response(200)
                 self.send_header("Subscription-Userinfo", "aggregate-fixture")
                 self.end_headers()
             def log_message(self, *_): pass
+        class Bwh(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Subscription-Userinfo", "legacy-bwh")
+                self.end_headers()
+            def log_message(self, *_): pass
+        bwh_header = "legacy-bwh"
+        if os.environ.get("LEGACY_FIXTURE_PATH"):
+            import types
+            import test_legacy_fixture
+            legacy_test = test_legacy_fixture.LegacyFixtureTests("test_legacy_bwh_get_and_head")
+            legacy_test.setUp()
+            legacy = legacy_test.legacy
+            class FakeResponse:
+                headers = {"Content-Type": "text/plain"}
+                def __enter__(self): return self
+                def __exit__(self, *_): pass
+                def read(self, _): return b"synthetic legacy panel"
+            legacy.CLIENT = types.SimpleNamespace(open=lambda *_args, **_kwargs: FakeResponse())
+            legacy.settings = lambda: ({"/x/bwh", "/x/newbwh"}, None)
+            Bwh = legacy.Handler
+            bwh_header = "upload=7;download=13;total=100;expire=0"
         panel = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Panel)
         panel_thread = threading.Thread(target=panel.serve_forever, daemon=True)
         panel_thread.start()
+        bwh = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Bwh)
+        bwh_thread = threading.Thread(target=bwh.serve_forever, daemon=True)
+        bwh_thread.start()
+        config["panel_port"] = panel.server_port
+        config["bwh_bridge_port"] = bwh.server_port
         with tempfile.TemporaryDirectory(prefix="dispatch-nginx-") as directory:
             conf = Path(directory) / "nginx.conf"
             conf.write_text(
@@ -102,7 +129,7 @@ http {
                     except OSError:
                         time.sleep(0.05)
                 self.assertEqual(get("/x/dmit"), (200, "upload=2; download=3; total=20", None))
-                self.assertEqual(get("/x/bwh"), (200, "legacy-bwh", None))
+                self.assertEqual(get("/x/bwh"), (200, bwh_header, None))
                 self.assertEqual(get("/x/ordinary?value=%25"), (200, "aggregate-fixture", None))
                 self.assertEqual(get("/x/ordinary?redirect=1"), (307, None, "/x/dmit"))
                 self.assertEqual(get("/x/dmit")[1], "upload=2; download=3; total=20")
@@ -113,7 +140,7 @@ http {
                 fixture.db.execute("UPDATE subscribe_files SET file_short_code='newbwh' WHERE id=4")
                 fixture.db.execute("UPDATE subscribe_files SET file_short_code='bwh' WHERE id=5")
                 fixture.db.commit()
-                self.assertEqual(get("/x/newbwh"), (200, "legacy-bwh", None))
+                self.assertEqual(get("/x/newbwh"), (200, bwh_header, None))
                 self.assertEqual(get("/x/bwh"), (200, "upload=2; download=3; total=20", None))
                 self.assertEqual(get("/x/dmit")[0], 404)
                 fixture.db.execute("UPDATE subscribe_files SET custom_short_code='bwh' WHERE id=3")
@@ -131,8 +158,11 @@ http {
                 server.server_close()
                 panel.shutdown()
                 panel.server_close()
+                bwh.shutdown()
+                bwh.server_close()
                 thread.join(timeout=2)
                 panel_thread.join(timeout=2)
+                bwh_thread.join(timeout=2)
                 fixture.tearDown()
 
     def test_exact_location_fails_to_protect_rotated_paths(self):

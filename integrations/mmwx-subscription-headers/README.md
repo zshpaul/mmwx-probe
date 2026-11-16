@@ -49,6 +49,9 @@ encoding and dot-segment forms before selecting `/x/`, and tests synthetic
 identities 4/9 and 5/10, rotation, reassignment, collisions, a 307 response
 and an unavailable database. The fixture rejects encoded subscription paths,
 including singly encoded forms, rather than assuming future short-code formats.
+When `LEGACY_FIXTURE_PATH` names an existing legacy script, the nginx fixture
+uses that script's extracted BWH handler with synthetic settings and synthetic
+upstream responses; the legacy production service is not contacted.
 It exercises only the included cases: it does not establish coverage of every
 possible raw URI or prove that the inferred path construction exactly matches
 the production panel. Non-subscription paths and RPC need separate routing.
