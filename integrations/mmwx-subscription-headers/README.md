@@ -54,7 +54,10 @@ uses that script's extracted BWH handler with synthetic settings and synthetic
 upstream responses; the legacy production service is not contacted.
 It exercises only the included cases: it does not establish coverage of every
 possible raw URI or prove that the inferred path construction exactly matches
-the production panel. Non-subscription paths and RPC need separate routing.
+the production panel. A double-encoded separator and dot segment before `/x/`
+is an explicit fixture counterexample that still reaches the catch-all; the
+production panel's handling of a corresponding valid subscription is unknown.
+Non-subscription paths and RPC need separate routing.
 Neither this code nor its failure strategy is approved for production without
 the combined routing tests and review described above.
 

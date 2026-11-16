@@ -99,6 +99,7 @@ http {
     "~*^/x/[^?]*%" 1;
     "~^/x//" 1;
     "~^/x/(?:[^?]*/)?\.{1,2}(?:/|$|\?)" 1;
+    "~*^/(?:[^/?]+/)*(?:%(?:25)*2e|\.){1,2}(?:/|%(?:25)*2f)(?:x|%(?:25)*78)(?:/|%(?:25)*2f)" 1;
   }
   server {
 """ +
@@ -134,8 +135,12 @@ http {
                 self.assertEqual(get("/x/ordinary?redirect=1"), (307, None, "/x/dmit"))
                 self.assertEqual(get("/x/dmit")[1], "upload=2; download=3; total=20")
                 for invalid in ("/%2578/dmit", "/%78/dmit", "/x/%2564mit", "/x/%64mit",
-                                "/x%2fdmit", "/%2fx/dmit", "/x/../dmit", "/x//dmit"):
+                                "/x%2fdmit", "/%2fx/dmit", "/x/../dmit", "/x//dmit",
+                                "/%252e%252e/x/dmit"):
                     self.assertEqual(get(invalid)[0], 400, invalid)
+                # Encoding both the preceding separator and dot segment can
+                # still bypass this finite guard. This is a negative assertion.
+                self.assertEqual(get("/foo%252f%252e%252e%252fx%252fdmit"), (200, "aggregate-fixture", None))
                 self.assertEqual(get("/unrelated?value=%25")[0], 200)
                 fixture.db.execute("UPDATE subscribe_files SET file_short_code='newbwh' WHERE id=4")
                 fixture.db.execute("UPDATE subscribe_files SET file_short_code='bwh' WHERE id=5")
