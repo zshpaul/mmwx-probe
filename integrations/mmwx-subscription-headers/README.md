@@ -42,12 +42,18 @@ errors closed. Reassignment is reclassified on the next request rather than
 permanently exempting old protected codes. If the mapping cannot be read, even
 ordinary `/x/` subscriptions fail until it is readable again.
 
-This dispatcher is not wired into a production entry point or a proven nginx
-configuration. In particular, nginx selects locations after URI normalization:
-an encoded namespace prefix or dot segment may bypass a simple `/x/` location.
-The current nginx fixture is a negative example, not a validation of the
-dispatcher. Neither this code nor its failure strategy is approved for
-production without the combined routing tests and review described above.
+The dispatcher has an experimental loopback entry point using an external
+private configuration, but no production nginx configuration is included.
+An opt-in fixture uses nginx's raw request URI to reject selected ambiguous
+encoding and dot-segment forms before selecting `/x/`, and tests synthetic
+identities 4/9 and 5/10, rotation, reassignment, collisions, a 307 response
+and an unavailable database. The fixture rejects encoded subscription paths,
+including singly encoded forms, rather than assuming future short-code formats.
+It exercises only the included cases: it does not establish coverage of every
+possible raw URI or prove that the inferred path construction exactly matches
+the production panel. Non-subscription paths and RPC need separate routing.
+Neither this code nor its failure strategy is approved for production without
+the combined routing tests and review described above.
 
 Run the synthetic, loopback-only tests with Python and `cryptography` installed:
 

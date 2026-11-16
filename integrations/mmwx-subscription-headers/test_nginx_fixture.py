@@ -21,14 +21,24 @@ from test_dispatcher import DispatcherTests
 @unittest.skipUnless(os.environ.get("NGINX_FIXTURE") == "1" and shutil.which("nginx"),
                      "nginx fixture not requested or nginx unavailable")
 class NginxFixtureTests(unittest.TestCase):
-    def test_dispatcher_rotation_database_failure_and_nginx_boundary(self):
+    def test_guarded_dispatcher_rotation_and_nginx_boundary(self):
         fixture = DispatcherTests("test_dynamic_rotation_and_reassignment")
         fixture.setUp()
         config = fixture.config
+        fixture.db.execute("UPDATE subscribe_files SET id=4 WHERE id=1")
+        fixture.db.execute("UPDATE subscribe_files SET id=5 WHERE id=2")
+        fixture.db.execute("UPDATE external_subscriptions SET id=10 WHERE id=22")
+        fixture.db.commit()
+        config["protected_subscription_ids"] = [4]
+        config["protected_external_ids"] = [9]
+        config["mappings"][0]["subscription_id"] = 5
+        config["mappings"][0]["external_id"] = 10
         config.update({"panel_host_header": "example.org", "panel_port": 1111, "bwh_bridge_port": 2222})
         instance = overlay.Overlay(config)
         instance.header = lambda _: "upload=2; download=3; total=20"
-        def forward(port, *_args, **_kwargs):
+        def forward(port, method, target, headers):
+            if target == "/x/ordinary?redirect=1":
+                return (307, [("Location", "/x/dmit")], b"")
             return (200, [("Subscription-Userinfo", "legacy-bwh" if port == 2222 else "aggregate-fixture")], b"config")
         instance.forward = forward
         server = overlay.ThreadingHTTPServer(("127.0.0.1", 0), dispatcher.make_dispatch_handler(overlay, instance))
@@ -51,8 +61,22 @@ class NginxFixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="dispatch-nginx-") as directory:
             conf = Path(directory) / "nginx.conf"
             conf.write_text(
-                "events {}\nhttp { access_log off; server { "
+                r"""events {}
+http {
+  access_log off;
+  map $request_uri $reject_subscription_path {
+    default 0;
+    "~*^/%(?:25)*78(?:/|%(?:25)*2f)" 1;
+    "~*^/(?:/|%(?:25)*2f)+(?:x|%(?:25)*78)(?:/|%(?:25)*2f)" 1;
+    "~*^/x%(?:25)*2f" 1;
+    "~*^/x/[^?]*%" 1;
+    "~^/x//" 1;
+    "~^/x/(?:[^?]*/)?\.{1,2}(?:/|$|\?)" 1;
+  }
+  server {
+""" +
                 f"listen 127.0.0.1:{port}; "
+                "if ($reject_subscription_path) { return 400; } "
                 f"location ^~ /x/ {{ proxy_pass http://127.0.0.1:{server.server_port}; }} "
                 f"location / {{ proxy_pass http://127.0.0.1:{panel.server_port}; }} "
                 "} }\n", encoding="utf8")
@@ -63,7 +87,7 @@ class NginxFixtureTests(unittest.TestCase):
                     conn.request("GET", path)
                     response = conn.getresponse()
                     response.read()
-                    return response.status, response.getheader("Subscription-Userinfo")
+                    return response.status, response.getheader("Subscription-Userinfo"), response.getheader("Location")
                 finally:
                     conn.close()
             try:
@@ -77,21 +101,28 @@ class NginxFixtureTests(unittest.TestCase):
                         break
                     except OSError:
                         time.sleep(0.05)
-                self.assertEqual(get("/x/dmit"), (200, "upload=2; download=3; total=20"))
-                self.assertEqual(get("/x/bwh"), (200, "legacy-bwh"))
-                self.assertEqual(get("/x/ordinary"), (200, "aggregate-fixture"))
-                self.assertEqual(get("/x/%2564mit")[0], 503)
-                fixture.db.execute("UPDATE subscribe_files SET file_short_code='newbwh' WHERE id=1")
-                fixture.db.execute("UPDATE subscribe_files SET file_short_code='bwh' WHERE id=2")
+                self.assertEqual(get("/x/dmit"), (200, "upload=2; download=3; total=20", None))
+                self.assertEqual(get("/x/bwh"), (200, "legacy-bwh", None))
+                self.assertEqual(get("/x/ordinary?value=%25"), (200, "aggregate-fixture", None))
+                self.assertEqual(get("/x/ordinary?redirect=1"), (307, None, "/x/dmit"))
+                self.assertEqual(get("/x/dmit")[1], "upload=2; download=3; total=20")
+                for invalid in ("/%2578/dmit", "/%78/dmit", "/x/%2564mit", "/x/%64mit",
+                                "/x%2fdmit", "/%2fx/dmit", "/x/../dmit", "/x//dmit"):
+                    self.assertEqual(get(invalid)[0], 400, invalid)
+                self.assertEqual(get("/unrelated?value=%25")[0], 200)
+                fixture.db.execute("UPDATE subscribe_files SET file_short_code='newbwh' WHERE id=4")
+                fixture.db.execute("UPDATE subscribe_files SET file_short_code='bwh' WHERE id=5")
                 fixture.db.commit()
-                self.assertEqual(get("/x/newbwh"), (200, "legacy-bwh"))
-                self.assertEqual(get("/x/bwh"), (200, "upload=2; download=3; total=20"))
+                self.assertEqual(get("/x/newbwh"), (200, "legacy-bwh", None))
+                self.assertEqual(get("/x/bwh"), (200, "upload=2; download=3; total=20", None))
                 self.assertEqual(get("/x/dmit")[0], 404)
+                fixture.db.execute("UPDATE subscribe_files SET custom_short_code='bwh' WHERE id=3")
+                fixture.db.commit()
+                self.assertEqual(get("/x/bwh")[0], 503)
+                fixture.db.execute("UPDATE subscribe_files SET custom_short_code=NULL WHERE id=3")
+                fixture.db.commit()
                 config["database"] += ".missing"
                 self.assertEqual(get("/x/ordinary")[0], 503)
-                # Namespace prefix normalization can bypass this naïve nginx
-                # configuration entirely. This is a negative assertion.
-                self.assertEqual(get("/%2578/dmit"), (200, "aggregate-fixture"))
             finally:
                 if proc is not None:
                     proc.terminate()

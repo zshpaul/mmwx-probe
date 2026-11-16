@@ -1,11 +1,12 @@
 """Experimental finite short-link dispatcher; not a production nginx config."""
 
 from pathlib import Path
+import json
 import sqlite3
+import sys
 from urllib.parse import quote, urlsplit
 
 from bridge_core import Mapping, normalize_request_path
-from overlay import HOP_HEADERS
 
 
 def load_snapshot(config):
@@ -16,6 +17,8 @@ def load_snapshot(config):
         raise ValueError("invalid configured identities")
     entry = entries[0]
     sid, eid = entry["subscription_id"], entry["external_id"]
+    if any(type(value) is not int or value <= 0 for value in (sid, eid, *protected)):
+        raise ValueError("invalid configured identities")
     if sid in protected or eid in set(config["protected_external_ids"]):
         raise ValueError("protected identity collision")
     path = Path(config["database"]).resolve()
@@ -95,3 +98,19 @@ def make_dispatch_handler(overlay_module, instance):
             except Exception:
                 self.send_error(503, "subscription classification unavailable")
     return Handler
+
+
+def main():
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: dispatcher.py PRIVATE_CONFIG")
+    import overlay
+    with open(sys.argv[1], encoding="utf8") as source:
+        config = json.load(source)
+    load_snapshot(config)
+    instance = overlay.Overlay(config)
+    overlay.ThreadingHTTPServer(("127.0.0.1", int(config["listen_port"])),
+                                make_dispatch_handler(overlay, instance)).serve_forever()
+
+
+if __name__ == "__main__":
+    main()
