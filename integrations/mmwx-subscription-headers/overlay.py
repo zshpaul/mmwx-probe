@@ -126,11 +126,12 @@ def transform_rpc(request_body: bytes, response_body: bytes, private_bytes: byte
     for record in records:
         mapping = record[0]
         items = response["subscriptions"]
-        matched = [item for item in items if isinstance(item, dict) and item.get("id") == mapping.subscription_id]
+        matched = [item for item in items if isinstance(item, dict)
+                   and item.get("id") in (mapping.subscription_id, str(mapping.subscription_id))]
         if matched:
             try:
-                if any(item.get("filename") != mapping.rpc_filename for item in matched):
-                    raise ValueError("subscription filename changed")
+                if any(type(item.get("id")) is not int or item.get("filename") != mapping.rpc_filename for item in matched):
+                    raise ValueError("subscription identity changed")
                 changed = update_rpc_subscription(items, mapping, get_header(record)) or changed
             except Exception:
                 # Do not leave an unrelated aggregate quota on this entry.

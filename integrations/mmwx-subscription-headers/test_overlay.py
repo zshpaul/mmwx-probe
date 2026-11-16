@@ -74,6 +74,17 @@ class OverlayTests(unittest.TestCase):
         self.assertIsNone(values[1]["traffic_used"])
         self.assertIsNone(values[1]["traffic_total"])
 
+    def test_string_subscription_id_never_exposes_aggregate(self):
+        request = self.client_public + self.seal(self.keys["c2s"], {"method": "GET", "path": "/subscriptions"})
+        response = self.seal(self.keys["s2c"], {"subscriptions": [
+            {"id": "2", "filename": "second.yaml", "traffic_used": 999, "traffic_total": 1000},
+        ]})
+        result = overlay.transform_rpc(request, response, self.master_raw, [self.record],
+                                       lambda _: self.fail("unexpected fetch"))
+        value = self.open_response(result)["subscriptions"][0]
+        self.assertIsNone(value["traffic_used"])
+        self.assertIsNone(value["traffic_total"])
+
     def test_upstream_rejects_unapproved_host_before_dns(self):
         with patch("overlay.socket.getaddrinfo") as lookup:
             with self.assertRaises(ValueError):
