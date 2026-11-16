@@ -42,6 +42,9 @@ const clientGroupPrices: Record<string, ClientGroupPrice> = {
     renewal_price_cny: 120,
     renewal_cycle: "year",
     expiry_date: "2027-11-21",
+    region_country: "US",
+    region_name: "美国",
+    region_city: "洛杉矶",
   },
 };
 
