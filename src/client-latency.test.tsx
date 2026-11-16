@@ -1,10 +1,10 @@
 import { isIsolatedPoint } from "./Trend";
 import { clientLatencyInRange, clientLatencyRows, clientPresence, ClientLatencyDialog, ClientLatencyList } from "./ClientLatency";
-import { bwhUsGroupId, clientGroupDateRemaining, clientGroupPrice } from "./client-latency-prices";
+import { bwhUsGroupId, clientGroupDateRemaining, clientGroupPrice, dmitUsGroupId } from "./client-latency-prices";
 import { readRateSnapshot } from "./client-rate";
 import { quotaUsage } from "./client-quota";
 import { priceCards } from "./emerald-model";
-import { availableConfiguredGroups, configuredClientGroup, ServerCard } from "./App";
+import { availableConfiguredGroups, configuredClientGroup, configuredClientGroups, ServerCard } from "./App";
 import { renderToStaticMarkup } from "react-dom/server";
 const equal = (actual: unknown, expected: unknown) => {
   if (actual !== expected) throw new Error(`Expected ${expected}, got ${actual}`);
@@ -109,6 +109,21 @@ const noLatency = configuredClientGroup(configured, undefined, undefined, "2026-
 equal(noLatency.samples.length, 0);
 equal(noLatency.alias, configured.alias);
 const quota = { version: 1 as const, group_id: configured.id, revision: 1, updated_at: "2026-11-13T00:09:59Z", upload_bytes: 1024, download_bytes: 2048, total_bytes: 8192, expires_at: null };
+const dmitConfig = configuredClientGroups.find(item => item.id === dmitUsGroupId)!;
+equal(dmitConfig.alias, "dmitus");
+equal(dmitConfig.quotaEnabled, false);
+const dmitQuota = { ...quota, group_id: dmitUsGroupId };
+equal(availableConfiguredGroups([dmitConfig], [], { [dmitUsGroupId]: { quota: dmitQuota, presence: { state: "unknown" } } }).length, 0);
+const dmitEntries = availableConfiguredGroups([dmitConfig], [], { [dmitUsGroupId]: { quota: dmitQuota, presence: { state: "online", observedAt: quota.updated_at } } });
+equal(dmitEntries.length, 1);
+equal(dmitEntries[0].snapshot?.quota, undefined);
+const dmitMarkup = renderToStaticMarkup(<ServerCard group={dmitEntries[0].group} clientState="online" hasClientRate showUnknownQuota index={0} now={now} onPing={() => {}} />);
+equal(dmitMarkup.includes("dmitus"), true);
+equal(dmitMarkup.includes("¥120.00"), true);
+equal(dmitMarkup.includes("2027-11-21"), true);
+equal(dmitMarkup.includes("具体时间未知"), true);
+equal(dmitMarkup.includes(">未知</p>"), true);
+equal(dmitMarkup.includes("洛杉矶"), false);
 equal(configuredClientGroup(configured, undefined, quota)?.samples.length, 0);
 const independentRate = { ...activeRate, snapshot: { ...activeRate.snapshot, group_id: configured.id } };
 equal(readRateSnapshot(independentRate, 0, configured.id).presence.state, "online");

@@ -28,6 +28,7 @@ export function clientGroupDateRemaining(date: string, now: number): PriceCard |
 
 // Public, non-secret metadata, keyed by the confirmed persistent client group ID.
 export const bwhUsGroupId = "8a0929c0a3e3ad68ff8be667470b45ca";
+export const dmitUsGroupId = "f2f12d63d35852638ee68073d60e2028";
 const clientGroupPrices: Record<string, ClientGroupPrice> = {
   [bwhUsGroupId]: {
     renewal_price_cny: 80,
@@ -36,6 +37,11 @@ const clientGroupPrices: Record<string, ClientGroupPrice> = {
     region_country: "US",
     region_name: "美国",
     region_city: "洛杉矶",
+  },
+  [dmitUsGroupId]: {
+    renewal_price_cny: 120,
+    renewal_cycle: "year",
+    expiry_date: "2027-11-21",
   },
 };
 

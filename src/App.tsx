@@ -14,12 +14,14 @@ import { billableTraffic, trafficUsageLabel } from "./traffic-display";
 import { bytes, isNumber, locationName, nodeLocation, percent, priceCards, ratio, speed, uptime } from "./emerald-model";
 import { loadAverage } from "./telemetry-display";
 import { ClientLatencyDialog, ClientLatencyList, ClientLatencySummary, clientPresence, useClientLatency, type ClientGroup, type ClientPresence } from "./ClientLatency";
-import { bwhUsGroupId, clientGroupDateRemaining, clientGroupPrice } from "./client-latency-prices";
+import { bwhUsGroupId, clientGroupDateRemaining, clientGroupPrice, dmitUsGroupId } from "./client-latency-prices";
 import { quotaUsage, useClientQuota, type ClientQuota, type QuotaMode } from "./client-quota";
 import { useClientRate, type ClientRate, type RatePresence } from "./client-rate";
 
 // Populate only after a client identity has been persisted and verified.
-export const configuredClientGroups: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode }> = [];
+export const configuredClientGroups: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode; quotaEnabled?: boolean }> = [
+  { id: dmitUsGroupId, alias: "dmitus", quotaMode: "both", quotaEnabled: false },
+];
 
 export const designAttribution = "Emerald React adaptation for MMWX Probe; see /THIRD_PARTY_NOTICES.txt.";
 function Usage({ label, value, quantity, title, empty = false }: { label: string; value?: number; quantity?: string; title?: string; empty?: boolean }) {
@@ -64,15 +66,16 @@ export function configuredClientGroup(config: { id: string; alias: string }, sam
   return { id: config.id, alias: config.alias, samples: sampleGroup?.samples ?? [] };
 }
 type ConfiguredSnapshot = { quota?: ClientQuota; rate?: ClientRate; presence: RatePresence };
-export function availableConfiguredGroups(configs: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode }>, samples: ClientGroup[], snapshots: Record<string, ConfiguredSnapshot>) {
+export function availableConfiguredGroups(configs: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode; quotaEnabled?: boolean }>, samples: ClientGroup[], snapshots: Record<string, ConfiguredSnapshot>) {
   return configs.flatMap(config => {
-    const snapshot = snapshots[config.id];
+    const current = snapshots[config.id];
+    const snapshot = current && config.quotaEnabled === false ? { ...current, quota: undefined } : current;
     const group = configuredClientGroup(config, samples.find(item => item.id === config.id), snapshot?.quota, snapshot?.presence.observedAt);
     return group ? [{ config, group, snapshot }] : [];
   });
 }
-function ConfiguredClientPoller({ id, onUpdate }: { id: string; onUpdate: (id: string, snapshot: ConfiguredSnapshot) => void }) {
-  const quota = useClientQuota(id);
+function ConfiguredClientPoller({ id, quotaEnabled = true, onUpdate }: { id: string; quotaEnabled?: boolean; onUpdate: (id: string, snapshot: ConfiguredSnapshot) => void }) {
+  const quota = useClientQuota(id, quotaEnabled);
   const { rate, presence } = useClientRate(id);
   useEffect(() => { onUpdate(id, { quota, rate, presence }); }, [id, quota, rate, presence, onUpdate]);
   return null;
@@ -120,7 +123,7 @@ export function App() {
   const visibleConfigured = configured.filter(({ config }) => config.alias.toLowerCase().includes(search.toLowerCase()));
   const selectedClient = configured.find(({ group }) => group.id === clientDialog)?.group ?? clientGroups.find(group => group.id === clientDialog);
   const modeName = { light: "浅色主题", dark: "深色主题", system: "自动主题" }[mode];
-  return <>{configuredClientGroups.map(config => <ConfiguredClientPoller key={config.id} id={config.id} onUpdate={updateConfigured} />)}<Background /><div className="shell">
+  return <>{configuredClientGroups.map(config => <ConfiguredClientPoller key={config.id} id={config.id} quotaEnabled={config.quotaEnabled} onUpdate={updateConfigured} />)}<Background /><div className="shell">
     <header className={`topbar ${scrolled ? "scrolled" : ""}`}><a className="brand" href="#"><Server size={28} /><span>ZSH</span></a><nav aria-label="页面工具"><button className="icon-button theme-button" title={`${modeName} · 点击切换`} aria-label={`${modeName}，切换主题`} onClick={() => { const next = nextColorMode(mode); setMode(next); saveColorModePreference(next); applyAppearance(data?.appearance, next); }}>{mode === "system" ? <Monitor size={18} /> : mode === "light" ? <Sun size={18} /> : <Moon size={18} />}</button></nav></header>
     {data?.local_client_only ? <div className="demo-note">本机客户端代理延迟 · 机器主控未连接；BWH-US 为本机实测，其余测试组为合成数据</div> : ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("preview") && <div className="demo-note">本地测试预览 · 主控为模拟数据；BWH-US 如出现为本机实测，其余测速组为合成测试数据</div>}
     {import.meta.env.DEV && import.meta.env.VITE_PROBE_MOCK === "1" && new URLSearchParams(location.search).has("debug") && <div className="demo-note">演示环境 · 以下为模拟节点与趋势数据</div>}

@@ -5,9 +5,13 @@ export type ClientQuota = {
   version: 1; group_id: string; revision: number; updated_at: string;
   upload_bytes: number | null; download_bytes: number | null; total_bytes: number | null; expires_at: string | null;
 };
-export function useClientQuota(groupId = bwhUsGroupId): ClientQuota | undefined {
+export function useClientQuota(groupId = bwhUsGroupId, enabled = true): ClientQuota | undefined {
   const [quota, setQuota] = useState<ClientQuota>();
   useEffect(() => {
+    if (!enabled) {
+      setQuota(undefined);
+      return;
+    }
     let active = true;
     const controller = new AbortController();
     const load = async () => {
@@ -21,8 +25,8 @@ export function useClientQuota(groupId = bwhUsGroupId): ClientQuota | undefined 
     void load();
     const timer = setInterval(() => void load(), 60_000);
     return () => { active = false; controller.abort(); clearInterval(timer); };
-  }, [groupId]);
-  return quota;
+  }, [groupId, enabled]);
+  return enabled ? quota : undefined;
 }
 export type QuotaMode = "both" | "download";
 export function quotaUsage(quota?: ClientQuota, mode: QuotaMode = "both") {
