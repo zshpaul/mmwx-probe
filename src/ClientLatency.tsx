@@ -93,7 +93,7 @@ function measuredTime(sample?: ClientSample) {
   if (!sample || !Number.isFinite(Date.parse(sample.measured_at))) return "暂无测量时间";
   return new Date(sample.measured_at).toLocaleString("zh-CN", { hour12: false });
 }
-export function ClientLatencySummary({ group, onOpen }: { group: ClientGroup; onOpen: () => void }) {
+export function ClientLatencySummary({ group, onOpen, zeroMissing = false }: { group: ClientGroup; onOpen: () => void; zeroMissing?: boolean }) {
   const latest = group.samples.at(-1);
   const bars: { time?: number; latency?: number; tooltip?: string }[] = [];
   let previous: ClientSample | undefined;
@@ -105,7 +105,7 @@ export function ClientLatencySummary({ group, onOpen }: { group: ClientGroup; on
   const recent = bars.slice(-10);
   const padded = [...Array.from({ length: 10 - recent.length }, () => ({})), ...recent];
   return <PingSummaryLayout>
-    <PingPanels name={group.alias} bars={padded} latency={latest?.status === "ok" ? latest.delay_ms ?? undefined : undefined}
+    <PingPanels name={group.alias} bars={padded} latency={latest?.status === "ok" ? latest.delay_ms ?? undefined : undefined} zeroMissing={zeroMissing}
       latencyText={latest?.status === "failed" ? "测速失败" : undefined} client onOpen={onOpen} />
   </PingSummaryLayout>;
 }
