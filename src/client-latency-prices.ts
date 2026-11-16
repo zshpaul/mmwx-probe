@@ -20,7 +20,7 @@ export function clientGroupDateRemaining(date: string, now: number): PriceCard |
   const days = (target - today) / 86400000;
   return {
     label: "剩余时间",
-    value: days < 0 ? `${date}（已过到期日）` : days === 0 ? `${date}（到期日）` : `${days} 天 · ${date}`,
+    value: days < 0 ? "已到期" : `${days} 天`,
     tone: days > 7 ? "positive" : "warning",
     title: `到期日期：${date}（具体时间未知）`,
   };
