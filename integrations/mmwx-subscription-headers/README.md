@@ -35,13 +35,19 @@ request target. With an exact-only route, a rotated or double-encoded path can
 instead fall through to the panel and expose its aggregate header. The fixture
 asserts this negative result to prevent mistaking it for a safe route.
 
-A potential alternative routes a finite subscription path family through an
-authoritative, dynamically refreshed identity dispatcher and rejects ambiguous
-encodings. This is not implemented: if the mapping cannot be read, failing
-closed for unknown rotated DMIT paths also affects otherwise ordinary
-subscriptions in that family, because their identities cannot be distinguished.
-The single-layer matching change does not solve that routing failure; no nginx
-configuration in this repository is approved for production.
+`dispatcher.py` is an experimental alternative that reads subscription identity
+and short codes in a single read-only database transaction, classifies matching
+paths as additional, protected or ordinary, and fails unknown paths and database
+errors closed. Reassignment is reclassified on the next request rather than
+permanently exempting old protected codes. If the mapping cannot be read, even
+ordinary `/x/` subscriptions fail until it is readable again.
+
+This dispatcher is not wired into a production entry point or a proven nginx
+configuration. In particular, nginx selects locations after URI normalization:
+an encoded namespace prefix or dot segment may bypass a simple `/x/` location.
+The current nginx fixture is a negative example, not a validation of the
+dispatcher. Neither this code nor its failure strategy is approved for
+production without the combined routing tests and review described above.
 
 Run the synthetic, loopback-only tests with Python and `cryptography` installed:
 
