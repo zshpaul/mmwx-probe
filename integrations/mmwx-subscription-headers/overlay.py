@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from bridge_core import Mapping, SourceCache, select_mapping, update_rpc_subscription, validate_upstream
+from bridge_core import Mapping, SourceCache, normalize_request_path, select_mapping, update_rpc_subscription, validate_upstream
 
 MAX_BODY = 16 * 1024 * 1024
 HOP_HEADERS = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -191,7 +191,7 @@ def make_handler(overlay: Overlay):
         def handle_subscription(self, head):
             try:
                 records = load_records(overlay.config)
-                selected = select_mapping(urlsplit(self.path).path, [record[0] for record in records])
+                selected = select_mapping(normalize_request_path(urlsplit(self.path).path), [record[0] for record in records])
                 if selected is None:
                     self.send_error(404)
                     return

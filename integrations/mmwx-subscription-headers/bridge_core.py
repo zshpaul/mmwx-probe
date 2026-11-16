@@ -10,7 +10,7 @@ import re
 import threading
 import time
 from typing import Callable
-from urllib.parse import urlsplit
+from urllib.parse import unquote_to_bytes, urlsplit
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,22 @@ def select_mapping(path: str, mappings: list[Mapping]) -> Mapping | None:
     if len(matches) > 1:
         raise ValueError("ambiguous subscription path")
     return matches[0] if matches else None
+
+
+def normalize_request_path(path: str) -> str:
+    """Decode a single safe URL-encoding layer without changing path structure."""
+    if re.search(r"%(?![0-9a-fA-F]{2})", path):
+        raise ValueError("invalid path encoding")
+    if re.search(r"%(?:2f|5c|00)", path, re.IGNORECASE):
+        raise ValueError("encoded path separator or null")
+    try:
+        decoded = unquote_to_bytes(path).decode("ascii")
+    except UnicodeError as exc:
+        raise ValueError("non-ASCII path") from exc
+    if "%" in decoded or "\\" in decoded or "//" in decoded or any(
+            part in (".", "..") for part in decoded.split("/")):
+        raise ValueError("ambiguous path")
+    return decoded
 
 
 def normalize_traffic_header(value: str) -> str:
@@ -67,7 +83,7 @@ def update_rpc_subscription(items: object, mapping: Mapping, header: str) -> boo
     if not isinstance(items, list):
         return False
     fields = dict(part.split("=", 1) for part in normalize_traffic_header(header).split("; "))
-    expiry = int(fields.get("expire", "0"))
+    expiry = int(fields["expire"]) if "expire" in fields else None
     expires_at = datetime.fromtimestamp(expiry, timezone.utc).isoformat().replace("+00:00", "Z") if expiry else None
     matches = [item for item in items if isinstance(item, dict)
                and item.get("id") == mapping.subscription_id
@@ -75,7 +91,8 @@ def update_rpc_subscription(items: object, mapping: Mapping, header: str) -> boo
     for item in matches:
         item["traffic_used"] = int(fields["upload"]) + int(fields["download"])
         item["traffic_total"] = int(fields["total"])
-        item["expire_at"] = expires_at
+        if expiry is not None:
+            item["expire_at"] = expires_at
     return bool(matches)
 
 
@@ -87,9 +104,12 @@ class SourceCache:
         self._clock = clock
         self._values: dict[int, tuple[float, str]] = {}
         self._lock = threading.Lock()
+        self._source_locks: dict[int, threading.Lock] = {}
 
     def get(self, external_id: int, fetch: Callable[[], str]) -> str:
         with self._lock:
+            source_lock = self._source_locks.setdefault(external_id, threading.Lock())
+        with source_lock:
             cached = self._values.get(external_id)
             now = self._clock()
             if cached and now - cached[0] < self._ttl:

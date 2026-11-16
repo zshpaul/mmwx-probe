@@ -124,7 +124,7 @@ class OverlayTests(unittest.TestCase):
                 if port == 2222:
                     self.assertEqual(body, request)
                     return 200, [("Content-Type", "application/octet-stream")], original
-                self.assertEqual(target, "/second")
+                self.assertIn(target, ("/second", "/%73econd?test=1"))
                 return 200, [("Content-Type", "text/plain")], b"fixture"
             instance.forward = forward
             server = overlay.ThreadingHTTPServer(("127.0.0.1", 0), overlay.make_handler(instance))
@@ -135,6 +135,11 @@ class OverlayTests(unittest.TestCase):
                 try:
                     connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
                     connection.request("GET", "/second")
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.getheader("Subscription-Userinfo"), "upload=2; download=3; total=214748364800")
+                    self.assertEqual(response.read(), b"fixture")
+                    connection.request("GET", "/%73econd?test=1")
                     response = connection.getresponse()
                     self.assertEqual(response.status, 200)
                     self.assertEqual(response.getheader("Subscription-Userinfo"), "upload=2; download=3; total=214748364800")

@@ -15,7 +15,7 @@ and validated, not scaled or replaced with fixed allowances.
 
 | Case | Experimental behavior | Important limit |
 | --- | --- | --- |
-| GET/HEAD for an identified additional subscription | Preserve panel body and return independent upstream usage header | Production nginx routing, normalization, rotation and behavior when the overlay is unreachable have not been verified. |
+| GET/HEAD for an identified additional subscription | Preserve panel body and return independent upstream usage header; decode one safe encoding layer for matching | Production nginx routing, rotation and behavior when the overlay is unreachable have not been verified. |
 | Successful RPC decryption and independent upstream fetch | Keep the legacy bridge response's BWH values; update only the exact additional ID and filename with upload + download and total | The encrypted response is re-encoded; BWH field values are preserved, not ciphertext bytes. |
 | Additional upstream fails after RPC is decoded | Set that entry's usage and total to null; preserve its expiry and BWH fields | Real installed MeowX null handling has not been validated in an isolated end-to-end test. |
 | Global key, configuration, decryption or parsing failure | Return the original legacy bridge response unchanged | It can contain an incorrect aggregate for DMIT. This deliberately retains legacy fallback semantics and does not guarantee correct DMIT usage. |
@@ -27,6 +27,13 @@ behavior without disclosing secrets; review GET and RPC routing and failure
 isolation; test the installed client's handling and refresh behavior; prepare
 backup and rollback; and obtain review of the exact change. Do not enable
 DMIT quota upload based solely on this prototype.
+
+A separate synthetic nginx fixture demonstrated that an exact location routes
+an encoded known path by its normalized value while the upstream receives the
+original request target. With an exact-only route, a rotated or double-encoded
+path can instead fall through to the panel and expose its aggregate header.
+The single-layer matching change does not solve that routing failure; no nginx
+configuration in this repository is approved for production.
 
 Run the synthetic, loopback-only tests with Python and `cryptography` installed:
 
