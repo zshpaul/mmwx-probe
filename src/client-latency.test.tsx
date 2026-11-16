@@ -2,8 +2,9 @@ import { isIsolatedPoint } from "./Trend";
 import { clientLatencyInRange, clientLatencyRows, clientPresence, ClientLatencyDialog, ClientLatencyList } from "./ClientLatency";
 import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
 import { readRateSnapshot } from "./client-rate";
+import { quotaUsage } from "./client-quota";
 import { priceCards } from "./emerald-model";
-import { ServerCard } from "./App";
+import { configuredClientGroup, ServerCard } from "./App";
 import { renderToStaticMarkup } from "react-dom/server";
 const equal = (actual: unknown, expected: unknown) => {
   if (actual !== expected) throw new Error(`Expected ${expected}, got ${actual}`);
@@ -91,3 +92,33 @@ const onlineMarkup = renderToStaticMarkup(<ServerCard group={group} clientState=
 equal(onlineMarkup.includes('server-card offline'), false);
 const unknownList = renderToStaticMarkup(<ClientLatencyList groups={[group]} now={now} available={false} ratePresence={{ state: "unknown" }} onOpen={() => {}} />);
 equal(unknownList.includes("状态未知"), true);
+
+// A configured identity appears only with real evidence and retains an empty history when no sample exists.
+const configured = { id: "independent", alias: "new group" };
+equal(configuredClientGroup(configured), undefined);
+const noLatency = configuredClientGroup(configured, undefined, undefined, "2026-11-13T00:09:59Z")!;
+equal(noLatency.samples.length, 0);
+equal(noLatency.alias, configured.alias);
+const quota = { version: 1 as const, group_id: configured.id, revision: 1, updated_at: "2026-11-13T00:09:59Z", upload_bytes: 1024, download_bytes: 2048, total_bytes: 8192, expires_at: null };
+equal(configuredClientGroup(configured, undefined, quota)?.samples.length, 0);
+const independentRate = { ...activeRate, snapshot: { ...activeRate.snapshot, group_id: configured.id } };
+equal(readRateSnapshot(independentRate, 0, configured.id).presence.state, "online");
+let rejectedWrongGroup = false;
+try { readRateSnapshot(independentRate, 0, bwhUsGroupId); } catch { rejectedWrongGroup = true; }
+equal(rejectedWrongGroup, true);
+const configuredMarkup = renderToStaticMarkup(<ServerCard group={noLatency} clientState="online" hasClientRate rate={{ observed_at: "2026-11-13T00:09:59Z", upload_bps: 1024, download_bps: 2048 }} index={0} now={now} onPing={() => {}} />);
+equal(configuredMarkup.includes("new group"), true);
+equal(configuredMarkup.includes("CNY / 年"), false);
+equal(configuredMarkup.includes("1 KB/s"), true);
+equal(configuredMarkup.includes("2 KB/s"), true);
+const quotaMarkup = renderToStaticMarkup(<ServerCard group={noLatency} quota={quota} index={0} now={now} onPing={() => {}} />);
+equal(quotaMarkup.includes("3 KB / 8 KB"), true);
+equal(quotaMarkup.includes("上传 1 KB"), true);
+equal(quotaMarkup.includes("下载 2 KB"), true);
+equal(quotaUsage(quota).used, 3072);
+equal(quotaUsage(quota, "download").used, 2048);
+equal(quotaUsage({ ...quota, upload_bytes: null }, "download").remaining, 6144);
+equal(quotaUsage({ ...quota, download_bytes: null }, "download").used, undefined);
+const downloadMarkup = renderToStaticMarkup(<ServerCard group={noLatency} quota={quota} quotaMode="download" index={0} now={now} onPing={() => {}} />);
+equal(downloadMarkup.includes("2 KB / 8 KB"), true);
+equal(downloadMarkup.includes("统计方式：仅下行"), true);

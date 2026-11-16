@@ -110,9 +110,9 @@ export function ClientLatencySummary({ group, onOpen }: { group: ClientGroup; on
   </PingSummaryLayout>;
 }
 
-export function ClientLatencyList({ groups, onOpen, available, now, ratePresence }: { groups: ClientGroup[]; onOpen: (id: string) => void; available: boolean; now: number; ratePresence: RatePresence }) {
+export function ClientLatencyList({ groups, onOpen, available, now, ratePresence, scopedRate = false }: { groups: ClientGroup[]; onOpen: (id: string) => void; available: boolean; now: number; ratePresence: RatePresence; scopedRate?: boolean }) {
   return <div className="client-list" aria-label="客户端代理延迟列表">{groups.map(group => {
-    const presence = clientPresence(group, now, available, ratePresence);
+    const presence = scopedRate ? ratePresence.state : clientPresence(group, now, available, ratePresence);
     return <button key={group.id} className="client-list-row" onClick={() => onOpen(group.id)}>
       <span><Activity size={15} /><strong>{group.alias}</strong><small>客户端代理延迟</small></span><span>{presence === "offline" ? "离线" : presence === "unknown" ? "状态未知" : status(group.samples.at(-1))} · {measuredTime(group.samples.at(-1))}</span>
     </button>;

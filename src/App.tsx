@@ -15,14 +15,17 @@ import { bytes, isNumber, locationName, nodeLocation, percent, priceCards, ratio
 import { loadAverage } from "./telemetry-display";
 import { ClientLatencyDialog, ClientLatencyList, ClientLatencySummary, clientPresence, useClientLatency, type ClientGroup, type ClientPresence } from "./ClientLatency";
 import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
-import { quotaUsage, useClientQuota, type ClientQuota } from "./client-quota";
+import { quotaUsage, useClientQuota, type ClientQuota, type QuotaMode } from "./client-quota";
 import { useClientRate, type ClientRate } from "./client-rate";
+
+// Populate only after a client identity has been persisted and verified.
+export const configuredClientGroups: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode }> = [];
 
 export const designAttribution = "Emerald React adaptation for MMWX Probe; see /THIRD_PARTY_NOTICES.txt.";
 function Usage({ label, value, quantity, title, empty = false }: { label: string; value?: number; quantity?: string; title?: string; empty?: boolean }) {
   return <div className="usage" title={title}><div><span>{label}</span>{!empty && <strong>{percent(value)}</strong>}</div><div className="track">{!empty && <i className={value !== undefined && value >= 90 ? "danger" : value !== undefined && value >= 60 ? "warning" : ""} style={{ width: `${Math.min(100, Math.max(0, value ?? 0))}%` }} />}</div>{empty ? <p className="resource-quantity" aria-hidden="true">&nbsp;</p> : quantity && <p className="resource-quantity">{quantity}</p>}</div>;
 }
-export function ServerCard({ server, group, quota, rate, index, now, tri, onPing, clientState }: { server?: ProbeServer; group?: ClientGroup; quota?: ClientQuota; rate?: ClientRate; index: number; now: number; tri?: ProbePayload["tri_isp"]; onPing: () => void; clientState?: ClientPresence }) {
+export function ServerCard({ server, group, quota, rate, index, now, tri, onPing, clientState, hasClientRate = false, quotaMode = "both" }: { server?: ProbeServer; group?: ClientGroup; quota?: ClientQuota; rate?: ClientRate; index: number; now: number; tri?: ProbePayload["tri_isp"]; onPing: () => void; clientState?: ClientPresence; hasClientRate?: boolean; quotaMode?: QuotaMode }) {
   const traffic = server ? billableTraffic(server) : undefined;
   const localPreview = typeof location !== "undefined" && ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("preview");
   const groupPrice = group ? clientGroupPrice(group.id, localPreview) : undefined;
@@ -31,9 +34,9 @@ export function ServerCard({ server, group, quota, rate, index, now, tri, onPing
   const price = prices.find(card => card.label === "节点价格");
   const remaining = prices.find(card => card.label === "剩余时间");
   const placeholders = group?.id === bwhUsGroupId;
-  const clientTraffic = quotaUsage(quota);
+  const clientTraffic = quotaUsage(quota, quotaMode);
   const clientTrafficText = quota ? `${bytes(clientTraffic.used)}${isNumber(clientTraffic.total) && clientTraffic.total > 0 ? ` / ${bytes(clientTraffic.total)}` : ""}` : undefined;
-  const clientTrafficTitle = quota ? `订阅缓存流量；剩余 ${clientTraffic.remaining === undefined ? "未知" : bytes(clientTraffic.remaining)}；缓存更新时间：${new Date(quota.updated_at).toLocaleString("zh-CN", { hour12: false })}` : undefined;
+  const clientTrafficTitle = quota ? `订阅缓存流量；统计方式：${quotaMode === "download" ? "仅下行" : "上下行"}；上传 ${bytes(quota.upload_bytes ?? undefined)}；下载 ${bytes(quota.download_bytes ?? undefined)}；剩余 ${clientTraffic.remaining === undefined ? "未知" : bytes(clientTraffic.remaining)}；缓存更新时间：${new Date(quota.updated_at).toLocaleString("zh-CN", { hour12: false })}` : undefined;
   const offline = server ? !server.online : !!group && clientState === "offline";
   return <article className={`server-card ${offline ? "offline" : ""}`} aria-label={group ? `${group.alias}，客户端代理延迟` : undefined}>
     <div className="server-identity">{(server || group) && <span className={`status-dot ${offline ? "down" : group && clientState !== "online" ? "unknown" : ""}`} title={group && clientState === "unknown" ? "状态未知" : undefined} />}<h2>{server ? <a className="card-link" href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>{server.name || `节点 ${index + 1}`}</a> : <span title="客户端代理延迟测速组">{group?.alias}</span>}{(server || groupPrice) && nodeLocation(server ?? groupPrice!) && <span className="node-city" title={nodeLocation(server ?? groupPrice!)}>{nodeLocation(server ?? groupPrice!)}</span>}</h2>{(server || groupPrice) && <span className="server-icons">{server && <OsIcon os={server.os} />}<RegionFlag server={server ?? groupPrice!} /></span>}</div>
@@ -46,13 +49,30 @@ export function ServerCard({ server, group, quota, rate, index, now, tri, onPing
     <div className="card-facts">
       {offline && <div className="offline-overlay"><strong>离线</strong>{server?.last_seen && <span>{new Date(server.last_seen).toLocaleString("zh-CN", { hour12: false })}</span>}{group && <button className="offline-history" onClick={event => { event.stopPropagation(); onPing(); }}>查看历史</button>}</div>}
       <div className={offline ? "stale-facts" : ""}>
-        {(group || (server && (isNumber(server.upload_speed) || isNumber(server.download_speed)))) && <div className="fact-row"><span>速率</span><i />{server || placeholders ? <span className="speed-pair" title={group ? rate ? `BWH-US连接速率；采样时间：${new Date(rate.observed_at).toLocaleString("zh-CN", { hour12: false })}` : "BWH-US连接速率暂不可用" : undefined}><span className="upload"><ChevronUp size={12} />{speed(server ? server.upload_speed : rate?.upload_bps)}</span><span className="download"><ChevronDown size={12} />{speed(server ? server.download_speed : rate?.download_bps)}</span></span> : <span />}</div>}
+        {(group || (server && (isNumber(server.upload_speed) || isNumber(server.download_speed)))) && <div className="fact-row"><span>速率</span><i />{server || placeholders || hasClientRate ? <span className="speed-pair" title={group ? rate ? `${group.alias}连接速率；采样时间：${new Date(rate.observed_at).toLocaleString("zh-CN", { hour12: false })}` : `${group.alias}连接速率暂不可用` : undefined}><span className="upload"><ChevronUp size={12} />{speed(server ? server.upload_speed : rate?.upload_bps)}</span><span className="download"><ChevronDown size={12} />{speed(server ? server.download_speed : rate?.download_bps)}</span></span> : <span />}</div>}
         {(group || (server && isNumber(server.uptime))) && <div className="fact-row"><span>在线</span><i /><span title={placeholders ? "占位值，非实测" : undefined}>{server ? uptime(server.uptime) : placeholders ? "0" : ""}</span></div>}
         {(group || price || remaining) && <div className="fact-row"><span>费用</span><i /><span title={Number.isFinite(groupExpiry) ? `到期时间（香港时间）：${new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Hong_Kong", dateStyle: "medium", timeStyle: "medium", hour12: false }).format(groupExpiry)}` : remaining?.title}>{price && `${price.value}${price.unit ? ` ${price.unit}` : ""}`}{price && remaining && " · "}{remaining && <span className={remaining.tone}>{remaining.value}{remaining.unit && ` ${remaining.unit}`}</span>}</span></div>}
         {server ? <EmeraldPingSummary server={server} index={index} tri={tri} onOpen={onPing} /> : group && <ClientLatencySummary group={group} onOpen={onPing} />}
       </div>
     </div>
   </article>;
+}
+export function configuredClientGroup(config: { id: string; alias: string }, sampleGroup?: ClientGroup, quota?: ClientQuota, observedAt?: string): ClientGroup | undefined {
+  if (!sampleGroup && !quota && !observedAt) return undefined;
+  return { id: config.id, alias: config.alias, samples: sampleGroup?.samples ?? [] };
+}
+function ConfiguredClient({ config, sampleGroup, view, available, now, search }: { config: { id: string; alias: string; quotaMode: QuotaMode }; sampleGroup?: ClientGroup; view: string; available: boolean; now: number; search: string }) {
+  const quota = useClientQuota(config.id);
+  const { rate, presence } = useClientRate(config.id);
+  const [open, setOpen] = useState(false);
+  const group = configuredClientGroup(config, sampleGroup, quota, presence.observedAt);
+  if (!group) return null;
+  if (!config.alias.toLowerCase().includes(search.toLowerCase())) return null;
+  return <>
+    {view === "list" ? <ClientLatencyList groups={[group]} available={available} now={now} ratePresence={presence} onOpen={() => setOpen(true)} scopedRate /> :
+      <ServerCard group={group} quota={quota} quotaMode={config.quotaMode} rate={rate} clientState={presence.state} hasClientRate index={0} now={now} onPing={() => setOpen(true)} />}
+    {open && <ClientLatencyDialog group={group} onClose={() => setOpen(false)} />}
+  </>;
 }
 function selectedIndex() {
   const match = location.hash.match(/^#\/?server\/(\d+)$/);
@@ -88,7 +108,8 @@ export function App() {
   }, [data?.appearance?.color_mode]);
   const servers = data?.servers || [];
   const visible = servers.map((server, index) => ({ server, index })).filter(({ server }) => `${server.name || ""} ${locationName(server)} ${server.os || ""}`.toLowerCase().includes(search.toLowerCase()));
-  const visibleClients = clientGroups.filter(group => group.alias.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b.id === bwhUsGroupId) - Number(a.id === bwhUsGroupId));
+  const visibleClients = clientGroups.filter(group => !configuredClientGroups.some(config => config.id === group.id)).filter(group => group.alias.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b.id === bwhUsGroupId) - Number(a.id === bwhUsGroupId));
+  const visibleConfigured = configuredClientGroups.filter(config => config.alias.toLowerCase().includes(search.toLowerCase()));
   const selectedClient = clientGroups.find(group => group.id === clientDialog);
   const modeName = { light: "浅色主题", dark: "深色主题", system: "自动主题" }[mode];
   return <><Background /><div className="shell">
@@ -100,7 +121,7 @@ export function App() {
       <h1 className="sr-only">节点监控</h1>
       {!data.local_client_only && <FleetSummary servers={servers} visitorCountryCode={visitor?.countryCode} formatBytes={bytes} now={updatedAt ?? Date.now()} />}
       <div className="toolbar"><span className="group-tab">全部节点</span><div className="view-tools"><div className="view-switch" role="group" aria-label="显示方式"><button aria-label="卡片视图" title="卡片视图" aria-pressed={view === "grid"} onClick={() => setView("grid")}><LayoutGrid size={14} /></button><button aria-label="列表视图" title="列表视图" aria-pressed={view === "list"} onClick={() => setView("list")}><Table2 size={14} /></button></div><label className={`search ${search ? "has-value" : ""}`}><Search size={14} /><input aria-label="搜索节点" placeholder="搜索节点名称、地区、系统" value={search} onChange={event => setSearch(event.target.value)} /></label></div></div>
-      {visible.length || visibleClients.length ? view === "list" ? <>{visibleClients.length > 0 && <ClientLatencyList groups={visibleClients} available={clientAvailable} now={clientNow} ratePresence={clientRatePresence} onOpen={setClientDialog} />}{visible.length > 0 && <ServerList nodes={visible} tri={data.tri_isp} onPing={setPingNode} />}</> : <div className="servers grid">{visible.slice(0, 1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}{visibleClients.map(group => <ServerCard key={`client-${group.id}`} group={group} clientState={clientPresence(group, clientNow, clientAvailable, clientRatePresence)} quota={group.id === bwhUsGroupId ? clientQuota : undefined} rate={group.id === bwhUsGroupId ? clientRate : undefined} index={0} now={updatedAt ?? Date.now()} onPing={() => setClientDialog(group.id)} />)}{visible.slice(1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length || clientGroups.length ? "没有匹配的节点或测速组" : "暂无服务器或测速组"}</h2>{search && <button onClick={() => setSearch("")}>清除搜索</button>}</div>}
+      {visible.length || visibleClients.length || visibleConfigured.length ? view === "list" ? <>{visibleClients.length > 0 && <ClientLatencyList groups={visibleClients} available={clientAvailable} now={clientNow} ratePresence={clientRatePresence} onOpen={setClientDialog} />}{visibleConfigured.map(config => <ConfiguredClient key={config.id} config={config} sampleGroup={clientGroups.find(group => group.id === config.id)} view={view} available={clientAvailable} now={clientNow} search={search} />)}{visible.length > 0 && <ServerList nodes={visible} tri={data.tri_isp} onPing={setPingNode} />}</> : <div className="servers grid">{visible.slice(0, 1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}{visibleClients.map(group => <ServerCard key={`client-${group.id}`} group={group} clientState={clientPresence(group, clientNow, clientAvailable, clientRatePresence)} quota={group.id === bwhUsGroupId ? clientQuota : undefined} rate={group.id === bwhUsGroupId ? clientRate : undefined} index={0} now={updatedAt ?? Date.now()} onPing={() => setClientDialog(group.id)} />)}{visibleConfigured.map(config => <ConfiguredClient key={config.id} config={config} sampleGroup={clientGroups.find(group => group.id === config.id)} view={view} available={clientAvailable} now={clientNow} search={search} />)}{visible.slice(1).map(({ server, index }) => <ServerCard key={`server-${index}`} server={server} index={index} now={updatedAt ?? Date.now()} tri={data.tri_isp} onPing={() => setPingNode(index)} />)}</div> : <div className="empty"><Server size={28} /><h2>{servers.length || clientGroups.length || configuredClientGroups.length ? "没有匹配的节点或测速组" : "暂无服务器或测速组"}</h2>{search && <button onClick={() => setSearch("")}>清除搜索</button>}</div>}
     </main>}
     <VisitorInfo onVisitor={setVisitor} />
     {selectedClient && <ClientLatencyDialog group={selectedClient} onClose={() => setClientDialog(undefined)} />}
