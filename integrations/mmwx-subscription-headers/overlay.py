@@ -144,7 +144,9 @@ def make_handler(overlay: Overlay):
 
         def handle_subscription(self, head):
             try:
-                records = load_records(overlay.config)
+                records = getattr(self, "_additional_records", None)
+                if records is None:
+                    records = load_records(overlay.config)
                 selected = select_mapping(urlsplit(self.path).path, [record[0] for record in records])
                 if selected is None:
                     self.send_error(404)

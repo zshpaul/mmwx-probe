@@ -6,6 +6,7 @@ import sys
 from http.server import ThreadingHTTPServer
 from urllib.parse import urlsplit
 
+from bridge_core import select_mapping
 from overlay import Overlay, load_records, make_handler
 
 
@@ -22,9 +23,22 @@ def make_combined_handler(legacy, config):
         send_payload = additional_handler.send_payload
 
         def respond(self, head):
-            if urlsplit(self.path).path in extra_paths:
+            path = urlsplit(self.path).path
+            if path in protected_paths:
+                return super().respond(head)
+            try:
+                current_records = load_records(instance.config)
+                selected = select_mapping(path, [record[0] for record in current_records])
+                current_protected, _ = legacy.settings()
+                if selected is None or path in current_protected:
+                    return super().respond(head)
+            except Exception:
+                return super().respond(head)
+            self._additional_records = current_records
+            try:
                 return additional_handler.handle_subscription(self, head)
-            return super().respond(head)
+            finally:
+                del self._additional_records
 
     return CombinedHandler
 

@@ -133,6 +133,39 @@ class OverlayTests(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=3)
 
+    def test_rotated_added_path_uses_one_current_mapping(self):
+        config = {"panel_host_header": "example.org", "panel_port": 1111}
+        current = [self.record]
+        rotated = (Mapping(2, 22, frozenset({"/rotated"})),
+                   "https://example.org/test", "test", "example.org")
+        with patch("legacy_wrapper.load_records", side_effect=lambda _: current), patch(
+                "overlay.load_records", side_effect=AssertionError("request must use captured records")), patch(
+                "overlay.Overlay.forward", return_value=(200, [], b"fixture")), patch(
+                "overlay.fetch_upstream_header", return_value="upload=2;download=3;total=20"):
+            handler = legacy_wrapper.make_combined_handler(self.legacy, config)
+            server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                current[:] = [rotated]
+                connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+                connection.request("GET", "/rotated")
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.getheader("Subscription-Userinfo"), "upload=2; download=3; total=20")
+                response.read()
+                connection.request("GET", "/second")
+                response = connection.getresponse()
+                self.assertEqual(response.status, 404)
+                response.read()
+                connection.request("GET", "/first")
+                self.assertEqual(connection.getresponse().read(), b"bwh")
+                connection.close()
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+
 
 if __name__ == "__main__":
     unittest.main()
