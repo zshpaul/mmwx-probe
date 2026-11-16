@@ -14,7 +14,7 @@ import { billableTraffic, trafficUsageLabel } from "./traffic-display";
 import { bytes, isNumber, locationName, nodeLocation, percent, priceCards, ratio, speed, uptime } from "./emerald-model";
 import { loadAverage } from "./telemetry-display";
 import { ClientLatencyDialog, ClientLatencyList, ClientLatencySummary, clientPresence, useClientLatency, type ClientGroup, type ClientPresence } from "./ClientLatency";
-import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
+import { bwhUsGroupId, clientGroupDateRemaining, clientGroupPrice } from "./client-latency-prices";
 import { quotaUsage, useClientQuota, type ClientQuota, type QuotaMode } from "./client-quota";
 import { useClientRate, type ClientRate, type RatePresence } from "./client-rate";
 
@@ -32,7 +32,9 @@ export function ServerCard({ server, group, quota, rate, index, now, tri, onPing
   const prices = priceCards(server ?? groupPrice ?? {}, now);
   const groupExpiry = groupPrice?.expires_at ? Date.parse(groupPrice.expires_at) : NaN;
   const price = prices.find(card => card.label === "节点价格");
-  const remaining = prices.find(card => card.label === "剩余时间");
+  const remaining = groupPrice?.expiry_date
+    ? clientGroupDateRemaining(groupPrice.expiry_date, now)
+    : prices.find(card => card.label === "剩余时间");
   const placeholders = group?.id === bwhUsGroupId;
   const clientTraffic = quotaUsage(quota, quotaMode);
   const clientTrafficText = quota ? `${bytes(clientTraffic.used)}${isNumber(clientTraffic.total) && clientTraffic.total > 0 ? ` / ${bytes(clientTraffic.total)}` : ""}` : undefined;

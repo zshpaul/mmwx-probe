@@ -1,6 +1,6 @@
 import { isIsolatedPoint } from "./Trend";
 import { clientLatencyInRange, clientLatencyRows, clientPresence, ClientLatencyDialog, ClientLatencyList } from "./ClientLatency";
-import { bwhUsGroupId, clientGroupPrice } from "./client-latency-prices";
+import { bwhUsGroupId, clientGroupDateRemaining, clientGroupPrice } from "./client-latency-prices";
 import { readRateSnapshot } from "./client-rate";
 import { quotaUsage } from "./client-quota";
 import { priceCards } from "./emerald-model";
@@ -55,6 +55,11 @@ equal(bwhPrice.region_country, "US");
 equal(bwhPrice.region_city, "洛杉矶");
 equal(clientGroupPrice("group_123", true), undefined);
 equal(clientGroupPrice("other", true), undefined);
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T15:59:59Z"))?.value, "1");
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T16:00:00Z"))?.value, "到期日");
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-21T16:00:00Z"))?.value, "已过到期日");
+equal(clientGroupDateRemaining("2027-11-21", Date.parse("2027-11-20T16:00:00Z"))?.title, "到期日期：2027-11-21（具体时间未知）");
+equal(clientGroupDateRemaining("2027-02-30", Date.now()), undefined);
 
 const isolated = Array.from({ length: 101 }, (_, i) => ({ ...sample, measured_at: new Date(Date.parse(sample.measured_at) + i * 360_000).toISOString() }));
 const isolatedRows = clientLatencyRows(isolated);
