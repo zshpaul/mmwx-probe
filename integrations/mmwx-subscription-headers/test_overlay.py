@@ -60,6 +60,20 @@ class OverlayTests(unittest.TestCase):
             raise AssertionError("unexpected fetch")
         self.assertEqual(overlay.transform_rpc(request, response, self.master_raw, [self.record], fail), response)
 
+    def test_renamed_subscription_never_exposes_aggregate(self):
+        request = self.client_public + self.seal(self.keys["c2s"], {"method": "GET", "path": "/subscriptions"})
+        response = self.seal(self.keys["s2c"], {"subscriptions": [
+            {"id": 1, "filename": "first.yaml", "traffic_used": 123},
+            {"id": 2, "filename": "renamed.yaml", "traffic_used": 999, "traffic_total": 1000},
+        ]})
+        def fail(_):
+            raise AssertionError("renamed entry must not fetch")
+        result = overlay.transform_rpc(request, response, self.master_raw, [self.record], fail)
+        values = self.open_response(result)["subscriptions"]
+        self.assertEqual(values[0]["traffic_used"], 123)
+        self.assertIsNone(values[1]["traffic_used"])
+        self.assertIsNone(values[1]["traffic_total"])
+
     def test_upstream_rejects_unapproved_host_before_dns(self):
         with patch("overlay.socket.getaddrinfo") as lookup:
             with self.assertRaises(ValueError):

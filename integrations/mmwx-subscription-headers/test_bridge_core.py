@@ -1,4 +1,5 @@
 import unittest
+import threading
 
 from bridge_core import Mapping, SourceCache, normalize_traffic_header, select_mapping, update_rpc_subscription, validate_upstream
 
@@ -31,6 +32,28 @@ class BridgeCoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cache.get(11, lambda: "not a quota")
         self.assertIn("total=20", cache.get(22, lambda: "upload=3;download=4;total=20"))
+
+    def test_slow_source_does_not_block_another_cached_source(self):
+        cache = SourceCache()
+        cache.get(22, lambda: "upload=3;download=4;total=20")
+        entered, release, completed = threading.Event(), threading.Event(), threading.Event()
+        def slow():
+            entered.set()
+            if not release.wait(2):
+                raise RuntimeError("test timed out")
+            return "upload=1;download=2;total=10"
+        first = threading.Thread(target=lambda: cache.get(11, slow))
+        second = threading.Thread(target=lambda: (cache.get(22, lambda: "unexpected"), completed.set()))
+        first.start()
+        try:
+            self.assertTrue(entered.wait(1))
+            second.start()
+            self.assertTrue(completed.wait(1), "cached independent source was blocked")
+        finally:
+            release.set()
+            first.join(2)
+            if second.ident is not None:
+                second.join(2)
 
     def test_rpc_only_updates_exact_id_and_filename(self):
         items = [{"id": 1, "filename": "first.yaml", "traffic_used": 8},

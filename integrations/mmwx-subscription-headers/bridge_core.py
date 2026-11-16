@@ -87,9 +87,12 @@ class SourceCache:
         self._clock = clock
         self._values: dict[int, tuple[float, str]] = {}
         self._lock = threading.Lock()
+        self._source_locks: dict[int, threading.Lock] = {}
 
     def get(self, external_id: int, fetch: Callable[[], str]) -> str:
         with self._lock:
+            source_lock = self._source_locks.setdefault(external_id, threading.Lock())
+        with source_lock:
             cached = self._values.get(external_id)
             now = self._clock()
             if cached and now - cached[0] < self._ttl:
