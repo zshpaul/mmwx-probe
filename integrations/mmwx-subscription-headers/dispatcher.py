@@ -95,6 +95,12 @@ def make_dispatch_handler(overlay_module, instance, protected_handler=None):
                     allowed = {"content-type", "content-disposition", "profile-title", "profile-update-interval",
                                "profile-web-page-url", "support-url"}
                     response_headers = [(k, v) for k, v in response_headers if k.lower() in allowed]
+                    hours = instance.config["mappings"][0].get("profile_update_hours")
+                    if hours is not None:
+                        if type(hours) is not int or not 1 <= hours <= 168:
+                            raise ValueError("invalid profile update interval")
+                        response_headers = [(k, v) for k, v in response_headers if k.lower() != "profile-update-interval"]
+                        response_headers.append(("profile-update-interval", str(hours)))
                     response_headers.extend([("Subscription-Userinfo", value), ("Cache-Control", "no-store")])
                 self.send_payload(status, response_headers, body, head)
             except LookupError:

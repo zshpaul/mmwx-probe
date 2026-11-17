@@ -1,9 +1,12 @@
+import http.client
 import os
+import threading
 import sqlite3
 import tempfile
 import unittest
 
 import dispatcher
+import overlay
 
 
 class DispatcherTests(unittest.TestCase):
@@ -44,6 +47,48 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual(dispatcher.classify("/x/newbwh", self.config)[0], "protected")
         with self.assertRaises(LookupError):
             dispatcher.classify("/x/dmit", self.config)
+
+    def test_update_interval_only_for_additional_subscription(self):
+        self.config.update({"panel_host_header": "fixture", "panel_port": 1111, "bwh_bridge_port": 2222})
+        self.config["mappings"][0]["profile_update_hours"] = 1
+        instance = overlay.Overlay(self.config)
+        instance.forward = lambda *_args, **_kwargs: (200, [("Profile-Update-Interval", "24"),
+                                                              ("profile-update-interval", "48")], b"fixture")
+        instance.header = lambda _: "upload=2; download=3; total=20"
+        def protected(handler, head):
+            handler.send_payload(200, [("profile-update-interval", "6")], b"bwh", head)
+        server = overlay.ThreadingHTTPServer(("127.0.0.1", 0), dispatcher.make_dispatch_handler(overlay, instance, protected))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        def read(path, method="GET"):
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+            try:
+                conn.request(method, path)
+                response = conn.getresponse()
+                response.read()
+                return response.status, [v for k, v in response.getheaders() if k.lower() == "profile-update-interval"]
+            finally:
+                conn.close()
+        try:
+            self.assertEqual(read("/x/dmit"), (200, ["1"]))
+            self.assertEqual(read("/x/dmit", "HEAD"), (200, ["1"]))
+            instance.forward = lambda *_args, **_kwargs: (200, [], b"fixture")
+            self.assertEqual(read("/x/dmit"), (200, ["1"]))
+            instance.forward = lambda *_args, **_kwargs: (200, [("Profile-Update-Interval", "24"),
+                                                                  ("profile-update-interval", "48")], b"fixture")
+            instance.header = lambda _: (_ for _ in ()).throw(ValueError("source unavailable"))
+            self.assertEqual(read("/x/dmit"), (503, []))
+            instance.header = lambda _: "upload=2; download=3; total=20"
+            self.assertEqual(read("/x/bwh"), (200, ["6"]))
+            self.assertEqual(read("/x/ordinary"), (200, ["24", "48"]))
+            self.config["mappings"][0].pop("profile_update_hours")
+            self.assertEqual(read("/x/dmit"), (200, ["24", "48"]))
+            self.config["mappings"][0]["profile_update_hours"] = True
+            self.assertEqual(read("/x/dmit")[0], 503)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
 
     def test_fail_closed_ambiguous_unknown_and_database_failure(self):
         for path in ("/x/%2564mit", "/x/%2fdmit", "/x/%2e%2e/dmit", "/x//dmit"):

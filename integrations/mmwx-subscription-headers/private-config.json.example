@@ -12,7 +12,8 @@
       "subscription_id": 5,
       "external_id": 10,
       "rpc_filename": "REPLACE_WITH_VERIFIED_FILENAME",
-      "approved_host": "REPLACE_WITH_VERIFIED_UPSTREAM_HOST"
+      "approved_host": "REPLACE_WITH_VERIFIED_UPSTREAM_HOST",
+      "profile_update_hours": 1
     }
   ]
 }
