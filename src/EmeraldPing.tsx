@@ -13,17 +13,17 @@ type PingBar = { time?: number; latency?: number; loss?: number; tooltip?: strin
 export function PingSummaryLayout({ carrier, children, compact = false }: { carrier?: ReactNode; children?: ReactNode; compact?: boolean }) {
   return <div className={`emerald-ping${compact ? " compact" : ""}`}><div className="fact-row"><span>三网</span><i /><span className="carrier-values">{carrier}</span></div>{children}</div>;
 }
-export function PingPanels({ name, bars, latency, loss, onOpen, loading, error, client = false, latencyText, zeroMissing = false }: {
+export function PingPanels({ name, bars, latency, loss, onOpen, loading, error, client = false, latencyText, zeroMissing = false, clientFailureRate = false, latencyFailed = false }: {
   name: string; bars: PingBar[]; latency?: number; loss?: number; onOpen: () => void;
-  loading?: boolean; error?: string; client?: boolean; latencyText?: string; zeroMissing?: boolean;
+  loading?: boolean; error?: string; client?: boolean; latencyText?: string; zeroMissing?: boolean; clientFailureRate?: boolean; latencyFailed?: boolean;
 }) {
   return <div className="ping-panels">{(["latency", "loss"] as const).map(metric => {
-    const label = metric === "latency" ? "延迟" : "丢包";
+    const label = metric === "latency" ? latencyFailed ? "延迟 · 失败" : "延迟" : clientFailureRate ? "测速失败率" : "丢包";
     const value = metric === "latency" ? latency : loss;
-    const unavailable = client && metric === "loss";
+    const unavailable = client && metric === "loss" && !clientFailureRate;
     const placeholder = zeroMissing && (unavailable || (value === undefined && !latencyText));
-    const panel = <><span className="fact-row"><span>{label}</span><i /><span title={placeholder ? "占位值，非实测" : unavailable ? "\u672a\u6d4b\u91cf\u4e22\u5305" : undefined}>{placeholder ? metric === "latency" ? "0 ms" : "0.0%" : unavailable ? "\u2014" : metric === "latency" && latencyText ? latencyText : value === undefined ? "—" : metric === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`}</span></span>
-      <span className="ping-samples" role={unavailable ? undefined : "img"} aria-label={unavailable ? undefined : client ? "客户端 URLTest 采样条：左旧右新，缺测、切换及失败显示为缺失" : `${label}采样条：左旧右新，颜色表示分段均值`}>
+    const panel = <><span className="fact-row"><span>{label}</span><i /><span title={clientFailureRate && metric === "loss" ? "最近 10 条记录中有效 URLTest 样本的失败率，非 ICMP 丢包" : placeholder ? "占位值，非实测" : unavailable ? "\u672a\u6d4b\u91cf\u4e22\u5305" : undefined}>{placeholder ? metric === "latency" ? "0 ms" : "0.0%" : unavailable ? "\u2014" : metric === "latency" && latencyText ? latencyText : value === undefined ? "—" : metric === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`}</span></span>
+      <span className="ping-samples" role={unavailable ? undefined : "img"} aria-label={unavailable ? undefined : clientFailureRate ? "URLTest 采样条：左旧右新；失败率色条中红色表示失败，灰色表示缺测" : client ? "客户端 URLTest 采样条：左旧右新，缺测、切换及失败显示为缺失" : `${label}采样条：左旧右新，颜色表示分段均值`}>
         {!unavailable && bars.map((bar, index) => {
           const tooltip = bar.tooltip || error || (loading ? "加载中" : bar.time === undefined ? "暂无数据" : pingSampleTooltip(bar.time, bar[metric], metric));
           return <span key={index} tabIndex={0} role="img" aria-label={tooltip} data-tooltip={tooltip} className={`ping-sample ${pingTone(bar[metric], metric)}`} />;
