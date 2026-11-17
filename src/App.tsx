@@ -20,7 +20,7 @@ import { useClientRate, type ClientRate, type RatePresence } from "./client-rate
 
 // Populate only after a client identity has been persisted and verified.
 export const configuredClientGroups: ReadonlyArray<{ id: string; alias: string; quotaMode: QuotaMode; quotaEnabled?: boolean }> = [
-  { id: dmitUsGroupId, alias: "DMIT-US", quotaMode: "both", quotaEnabled: false },
+  { id: dmitUsGroupId, alias: "DMIT-US", quotaMode: "both" },
 ];
 
 export const designAttribution = "Emerald React adaptation for MMWX Probe; see /THIRD_PARTY_NOTICES.txt.";
@@ -39,9 +39,13 @@ export function ServerCard({ server, group, quota, rate, index, now, tri, onPing
     : prices.find(card => card.label === "剩余时间");
   const dmitPlaceholders = group?.id === dmitUsGroupId;
   const placeholders = group?.id === bwhUsGroupId || dmitPlaceholders;
-  const clientTraffic = quotaUsage(quota, quotaMode);
+  const rawClientTraffic = quotaUsage(quota, quotaMode);
+  const displayMultiplier = dmitPlaceholders ? 2 : 1;
+  const scaleDisplay = (value: number | undefined) => value !== undefined && Number.isSafeInteger(value * displayMultiplier) ? value * displayMultiplier : undefined;
+  const clientTraffic = { used: scaleDisplay(rawClientTraffic.used), total: scaleDisplay(rawClientTraffic.total), remaining: scaleDisplay(rawClientTraffic.remaining) };
   const clientTrafficText = quota ? `${bytes(dmitPlaceholders ? clientTraffic.used ?? 0 : clientTraffic.used)}${isNumber(clientTraffic.total) && clientTraffic.total > 0 ? ` / ${bytes(clientTraffic.total)}` : dmitPlaceholders ? " / 0 B" : ""}` : dmitPlaceholders ? "0 B / 0 B" : undefined;
-  const clientTrafficTitle = quota ? `订阅缓存流量；统计方式：${quotaMode === "download" ? "仅下行" : "上下行"}；上传 ${bytes(quota.upload_bytes ?? undefined)}；下载 ${bytes(quota.download_bytes ?? undefined)}；剩余 ${clientTraffic.remaining === undefined ? "未知" : bytes(clientTraffic.remaining)}；缓存更新时间：${new Date(quota.updated_at).toLocaleString("zh-CN", { hour12: false })}` : dmitPlaceholders ? "占位值，非实测" : undefined;
+  const quotaPlaceholder = dmitPlaceholders && (clientTraffic.used === undefined || clientTraffic.total === undefined || clientTraffic.total <= 0);
+  const clientTrafficTitle = quota ? `${quotaPlaceholder ? "缺失值及百分比为占位，非实测；" : ""}${dmitPlaceholders ? "展示值为订阅原始值×2（用户指定）；" : ""}订阅缓存流量；统计方式：${quotaMode === "download" ? "仅下行" : "上下行"}；上传 ${bytes(quota.upload_bytes ?? undefined)}；下载 ${bytes(quota.download_bytes ?? undefined)}；剩余 ${clientTraffic.remaining === undefined ? "未知" : bytes(clientTraffic.remaining)}；缓存更新时间：${new Date(quota.updated_at).toLocaleString("zh-CN", { hour12: false })}` : dmitPlaceholders ? "占位值，非实测" : undefined;
   const offline = server ? !server.online : !!group && clientState === "offline";
   return <article className={`server-card ${offline ? "offline" : ""}`} aria-label={group ? `${group.alias}，客户端代理延迟` : undefined}>
     <div className="server-identity">{(server || group) && <span className={`status-dot ${offline ? "down" : group && clientState !== "online" ? "unknown" : ""}`} title={group && clientState === "unknown" ? "状态未知" : undefined} />}<h2>{server ? <a className="card-link" href={`#server/${index}`} aria-label={`查看 ${server.name || `节点 ${index + 1}`} 详情`}>{server.name || `节点 ${index + 1}`}</a> : <span title="客户端代理延迟测速组">{group?.alias}</span>}{(server || groupPrice) && nodeLocation(server ?? groupPrice!) && <span className="node-city" title={nodeLocation(server ?? groupPrice!)}>{nodeLocation(server ?? groupPrice!)}</span>}</h2>{(server || groupPrice) && <span className="server-icons">{server && <OsIcon os={server.os} />}<RegionFlag server={server ?? groupPrice!} /></span>}</div>
