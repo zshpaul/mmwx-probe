@@ -140,6 +140,8 @@ equal(dmitRealMarkup.includes("37.5%"), true);
 equal(quotaUsage(dmitQuota).used, 3072);
 const dmitPartialMarkup = renderToStaticMarkup(<ServerCard group={dmitRealGroup} quota={{ ...dmitQuota, download_bytes: null }} index={0} now={now} onPing={() => {}} />);
 equal(dmitPartialMarkup.includes("0 B / 16 KB"), true);
+equal(dmitPartialMarkup.includes("缺失值及百分比为占位，非实测"), true);
+equal(dmitPartialMarkup.includes("0.0%"), true);
 const gib = 1024 ** 3;
 const source200GiB = { ...dmitQuota, upload_bytes: gib, download_bytes: 4 * gib, total_bytes: 200 * gib };
 const dmit400Markup = renderToStaticMarkup(<ServerCard group={dmitRealGroup} quota={source200GiB} index={0} now={now} onPing={() => {}} />);
