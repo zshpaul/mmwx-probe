@@ -1,4 +1,5 @@
 import type { ProbeServer } from "./types";
+import { clientGroupCalendarDays } from "./client-latency-prices";
 import type { ProbeMetricPoint } from "./conn-sparkline";
 import { probeRangeBucketCount, probeRangeBucketSec } from "./probe-ranges";
 import { resourceHistoryFromSeries, type ResourceSeriesInput } from "./resource-history";
@@ -30,7 +31,7 @@ export function uptime(value?: number) {
 export const cycleNames = { month: "月", quarter: "季度", half_year: "半年", year: "年", two_year: "两年", three_year: "三年", permanent: "永久" };
 const cycleDays = { month: 30, quarter: 90, half_year: 180, year: 365, two_year: 730, three_year: 1095, permanent: 0 };
 const symbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$", EUR: "€", GBP: "£", JPY: "¥" };
-export function financeSummary(servers: ProbeServer[], now: number) {
+export function financeSummary(servers: (Partial<ProbeServer> & { expiry_date?: string })[], now: number, calendarDates = false) {
   const totals = new Map<string, { currency: string; total: number; monthly: number; remaining: number; priced: number; periodic: number; estimated: number }>();
   for (const server of servers) {
     const price = isNumber(server.renewal_price_cny) ? server.renewal_price_cny : server.renewal_price;
@@ -41,14 +42,17 @@ export function financeSummary(servers: ProbeServer[], now: number) {
     group.priced++;
     const days = server.renewal_cycle ? cycleDays[server.renewal_cycle] : undefined;
     const expiry = Date.parse(server.expires_at || "");
+    const remainingDays = calendarDates && server.expiry_date !== undefined
+      ? clientGroupCalendarDays(server.expiry_date, now)
+      : Number.isFinite(expiry) && Number.isFinite(now) ? (expiry - now) / 86400000 : undefined;
     if (price === 0) {
       group.periodic++;
       group.estimated++;
     } else if (days) {
       group.periodic++;
       group.monthly += price / days * 30;
-      if (Number.isFinite(expiry)) {
-        group.remaining += price * Math.max(0, (expiry - now) / 86400000) / days;
+      if (remainingDays !== undefined) {
+        group.remaining += price * Math.max(0, remainingDays) / days;
         group.estimated++;
       }
     }
