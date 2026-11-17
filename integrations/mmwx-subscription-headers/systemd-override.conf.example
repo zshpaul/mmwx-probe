@@ -1,0 +1,5 @@
+# Adapt paths after installing the reviewed files and a private configuration.
+# Keep the existing unit, user, restart policy and other settings unchanged.
+[Service]
+ExecStart=
+ExecStart=/usr/bin/python3 /usr/local/lib/mmwx-subscription-headers/legacy_wrapper.py /usr/local/lib/mmwx-bwh-traffic.py /etc/mmwx-subscription-headers/private.json

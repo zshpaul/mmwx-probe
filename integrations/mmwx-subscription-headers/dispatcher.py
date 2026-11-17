@@ -7,6 +7,7 @@ import sys
 from urllib.parse import quote, urlsplit
 
 from bridge_core import Mapping, normalize_request_path
+from overlay import HOP_HEADERS
 
 
 def load_snapshot(config):
@@ -74,14 +75,17 @@ def classify(raw_target, config):
     return selected[1], record
 
 
-def make_dispatch_handler(overlay_module, instance):
+def make_dispatch_handler(overlay_module, instance, protected_handler=None):
     """Use only as an isolated fixture until nginx routing is proven."""
     class Handler(overlay_module.make_handler(instance)):
         def handle_subscription(self, head):
             try:
                 category, record = classify(self.path, instance.config)
-                headers = {"User-Agent": self.headers.get("User-Agent", ""),
-                           "Accept-Encoding": "identity", "Host": instance.config["panel_host_header"]}
+                if category == "protected" and protected_handler is not None:
+                    return protected_handler(self, head)
+                headers = {key: value for key, value in self.headers.items()
+                           if key.lower() not in HOP_HEADERS | {"host", "accept-encoding"}}
+                headers.update({"Accept-Encoding": "identity", "Host": instance.config["panel_host_header"]})
                 port = instance.config["bwh_bridge_port"] if category == "protected" else instance.config["panel_port"]
                 status, response_headers, body = instance.forward(port, "GET", self.path, headers)
                 if category == "additional":

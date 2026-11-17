@@ -1,11 +1,11 @@
 # Experimental subscription header bridge
 
 This is an isolated review prototype. It is not deployed or configured by this
-repository. It forwards RPC requests to the existing BWH bridge first and can
-replace the selected additional subscription's usage after decrypting its
-response. GET/HEAD returns the panel's subscription body with usage from the
-additional subscription's independent upstream header. Production identities,
-hostnames, paths, keys and configuration are intentionally excluded.
+repository. `legacy_wrapper.py` retains the existing BWH handler and its RPC
+transport, and extends a successfully transformed response for the selected
+additional subscription. GET/HEAD returns the panel's subscription body with
+usage from that subscription's independent upstream header. Production
+hostnames, subscription paths, keys and configuration are intentionally excluded.
 
 The private configuration identifies an additional subscription by both
 subscription ID and filename, its separate external record and an explicitly
@@ -42,8 +42,9 @@ errors closed. Reassignment is reclassified on the next request rather than
 permanently exempting old protected codes. If the mapping cannot be read, even
 ordinary `/x/` subscriptions fail until it is readable again.
 
-The dispatcher has an experimental loopback entry point using an external
-private configuration, but no production nginx configuration is included.
+The dispatcher and legacy wrapper have loopback entry points using an external
+private configuration. The included nginx files are examples, not installed
+production configuration.
 An opt-in fixture uses nginx's raw request URI to reject selected ambiguous
 encoding and dot-segment forms before selecting `/x/`, and tests synthetic
 identities 4/9 and 5/10, rotation, reassignment, collisions, a 307 response
@@ -58,8 +59,46 @@ the production panel. A double-encoded separator and dot segment before `/x/`
 is an explicit fixture counterexample that still reaches the catch-all; the
 production panel's handling of a corresponding valid subscription is unknown.
 Non-subscription paths and RPC need separate routing.
-Neither this code nor its failure strategy is approved for production without
+Neither this code nor its failure strategy is ready for production without
 the combined routing tests and review described above.
+
+## Narrow deployment and rollback plan
+
+The example nginx `map` belongs in `http {}`; the example locations belong
+only in the intended panel's TLS `server {}`. Preserve existing BWH exact
+short-link locations pointing at the same legacy listener and preserve its
+exact secure-RPC location and named upstream, including their existing fallback.
+The wrapper handles those BWH exact paths via the original handler after
+reclassifying current short codes. Other methods under `/x/` are passed back to
+the panel. First check the current nginx configuration, existing location
+precedence and all referenced ports.
+
+Create private JSON outside Git with restricted permissions. Set the database and
+RPC-key paths from the existing deployment, the verified file identity and the
+approved DMIT upstream hostname. Never put subscription URLs, secret keys,
+tokens or private short codes in Git, logs, PRs or shell output. The original
+BWH upstream and credentials remain with the legacy script. The additional
+source must be HTTPS, pinned to an approved public address and host, and
+redirects are not followed.
+
+Before changing anything, save access-restricted copies and hashes of the
+legacy script, its unit and drop-ins, the panel's nginx configuration and
+included files, and any private config. Make a consistent SQLite backup using
+its backup API with a read-only source. Record running service versions and
+configuration paths. Retain these recovery files outside the repository.
+
+After review and CI, install the reviewed modules and private JSON, adapt the
+example systemd override and nginx includes, and validate the complete
+candidate nginx configuration with `nginx -t` before applying it. Restart only
+the BWH bridge, reload nginx, and verify original BWH GET and RPC, ordinary
+subscriptions and DMIT with a targeted refresh. Keep probe quota upload
+disabled until its separate source contract is verified.
+
+On failure, restore the backed-up unit/drop-in and nginx files, verify hashes
+and `nginx -t`, then reload nginx and restart the bridge with its original
+unit. Confirm original BWH and ordinary subscription behavior. The database
+backup is recovery material: do not overwrite live changes during a routine
+code rollback.
 
 Run the synthetic, loopback-only tests with Python and `cryptography` installed:
 

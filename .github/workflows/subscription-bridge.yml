@@ -26,4 +26,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install cryptography==43.0.0
-      - run: python -m unittest -v test_bridge_core test_overlay test_dispatcher
+      - run: python -m unittest -v test_bridge_core test_overlay test_dispatcher test_legacy_wrapper
