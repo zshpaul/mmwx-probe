@@ -185,7 +185,17 @@ const bwhFailedMarkup = renderToStaticMarkup(<ServerCard group={{ id: bwhUsGroup
 equal((bwhFailedMarkup.match(/ping-sample level-4/g) || []).length, 10);
 equal(bwhFailedMarkup.includes(">100.0%</span>"), true);
 equal(clientHealth(allFailed, now + 300_000).failureRate, 100);
+equal(clientHealth(allFailed, now + 300_001).failureRate, undefined);
 equal(clientHealth([], now).failureRate, undefined);
+const futureSample = { ...failed, measured_at: new Date(now + 1).toISOString() };
+equal(clientHealth([futureSample], now).fresh, false);
+equal(clientHealth([futureSample], now).failureRate, undefined);
+const afterFailures = [...allFailed.slice(-9), { ...recovered, measured_at: new Date(now + 1_000).toISOString(), delay_ms: 178 }];
+equal(clientHealth(afterFailures, now + 1_000).failureRate, 90);
+const afterFailuresMarkup = renderToStaticMarkup(<ServerCard group={{ ...dmitRealGroup, samples: afterFailures }} clientState="online" index={0} now={now + 1_000} onPing={() => {}} />);
+equal(afterFailuresMarkup.includes(">178 ms</span>"), true);
+equal(afterFailuresMarkup.includes(">90.0%</span>"), true);
+equal(afterFailuresMarkup.includes("延迟 · 失败"), false);
 const dmitOfflineMarkup = renderToStaticMarkup(<ServerCard group={dmitEntries[0].group} clientState="offline" index={0} now={now} onPing={() => {}} />);
 equal(dmitOfflineMarkup.includes("server-card offline"), true);
 equal(dmitOfflineMarkup.includes("查看历史"), true);
