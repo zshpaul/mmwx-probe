@@ -1,0 +1,22 @@
+# Adapt inside the existing target TLS server {} only after review.
+# Existing exact BWH /x/ locations continue to point to 12890. GET/HEAD are
+# dynamically classified; other methods retain the original legacy behavior.
+if ($mmwx_reject_subscription_uri) { return 400; }
+
+location ^~ /x/ {
+    # Only GET/HEAD use the classifier; preserve other methods on the panel.
+    error_page 418 = @mmwx_original_short_link;
+    if ($request_method !~ ^(GET|HEAD)$) { return 418; }
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:12890;
+}
+
+location @mmwx_original_short_link {
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:12889;
+}
+
+# Do not change the existing exact RPC location or its existing BWH upstream
+# fallback. The legacy wrapper extends transform_rpc in the same listener.
