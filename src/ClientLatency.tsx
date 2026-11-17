@@ -2,7 +2,7 @@
 import { Activity, X } from "lucide-react";
 import { requestJson } from "./request-json";
 import { PingPanels, PingSummaryLayout } from "./EmeraldPing";
-import { bwhUsGroupId } from "./client-latency-prices";
+import { bwhUsGroupId, dmitUsGroupId } from "./client-latency-prices";
 import type { RatePresence } from "./client-rate";
 import { detailRanges, type DetailRange } from "./emerald-model";
 const Trend = lazy(() => import("./Trend"));
@@ -93,20 +93,36 @@ function measuredTime(sample?: ClientSample) {
   if (!sample || !Number.isFinite(Date.parse(sample.measured_at))) return "暂无测量时间";
   return new Date(sample.measured_at).toLocaleString("zh-CN", { hour12: false });
 }
-export function ClientLatencySummary({ group, onOpen, zeroMissing = false }: { group: ClientGroup; onOpen: () => void; zeroMissing?: boolean }) {
+// Match the existing history gap boundary; this is measurement freshness, not client presence.
+export const CLIENT_LATENCY_FRESH_MS = 300_000;
+export function clientHealth(samples: ClientSample[], now: number) {
+  const latest = samples.at(-1);
+  const time = latest ? Date.parse(latest.measured_at) : NaN;
+  const fresh = Number.isFinite(time) && time <= now && now - time <= CLIENT_LATENCY_FRESH_MS;
+  const valid = samples.slice(-10).filter(sample => {
+    const measured = Date.parse(sample.measured_at);
+    return Number.isFinite(measured) && measured <= now && (sample.status === "failed" && sample.delay_ms === null ||
+      sample.status === "ok" && typeof sample.delay_ms === "number" && Number.isFinite(sample.delay_ms) && sample.delay_ms >= 0);
+  });
+  return { latest, fresh, failureRate: fresh && valid.length ? 100 * valid.filter(sample => sample.status === "failed").length / valid.length : undefined };
+}
+
+export function ClientLatencySummary({ group, onOpen, now = Date.now(), zeroMissing = false }: { group: ClientGroup; onOpen: () => void; now?: number; zeroMissing?: boolean }) {
+  const healthEnabled = group.id === bwhUsGroupId || group.id === dmitUsGroupId;
+  const health = clientHealth(group.samples, now);
   const latest = group.samples.at(-1);
-  const bars: { time?: number; latency?: number; tooltip?: string }[] = [];
+  const bars: { time?: number; latency?: number; loss?: number; tooltip?: string }[] = [];
   let previous: ClientSample | undefined;
   for (const sample of group.samples) {
     if (previous && (sample.segment !== previous.segment || sample.node !== previous.node || Date.parse(sample.measured_at) - Date.parse(previous.measured_at) > 300_000)) bars.push({ tooltip: "切换或缺测" });
-    bars.push({ time: Date.parse(sample.measured_at) / 1000, latency: sample.status === "ok" ? sample.delay_ms ?? undefined : undefined, tooltip: `${measuredTime(sample)} · ${status(sample)}` });
+    bars.push({ time: Date.parse(sample.measured_at) / 1000, latency: sample.status === "ok" ? sample.delay_ms ?? undefined : undefined, loss: sample.status === "failed" && sample.delay_ms === null ? 100 : sample.status === "ok" && typeof sample.delay_ms === "number" && Number.isFinite(sample.delay_ms) && sample.delay_ms >= 0 ? 0 : undefined, tooltip: `${measuredTime(sample)} · ${status(sample)}` });
     previous = sample;
   }
   const recent = bars.slice(-10);
   const padded = [...Array.from({ length: 10 - recent.length }, () => ({})), ...recent];
   return <PingSummaryLayout>
-    <PingPanels name={group.alias} bars={padded} latency={latest?.status === "ok" ? latest.delay_ms ?? undefined : undefined} zeroMissing={zeroMissing}
-      latencyText={latest?.status === "failed" ? "测速失败" : undefined} client onOpen={onOpen} />
+    <PingPanels name={group.alias} bars={healthEnabled && !health.fresh ? padded.map(() => ({})) : padded} latency={(!healthEnabled || health.fresh) && latest?.status === "ok" ? latest.delay_ms ?? undefined : undefined} loss={healthEnabled ? health.failureRate : undefined} zeroMissing={healthEnabled ? false : zeroMissing}
+      latencyText={healthEnabled && latest && !health.fresh ? "已过期" : !healthEnabled && latest?.status === "failed" ? "测速失败" : undefined} client clientFailureRate={healthEnabled} onOpen={onOpen} />
   </PingSummaryLayout>;
 }
 
