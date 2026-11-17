@@ -7,7 +7,7 @@ import { numericToAlpha2 } from "i18n-iso-countries";
 import { ChevronDown, ChevronUp, Coins, HardDrive, MemoryStick, Network, X } from "lucide-react";
 import type { ProbeServer } from "./types";
 import { billableTraffic } from "./traffic-display";
-import { financeSummary, isNumber, speed } from "./emerald-model";
+import { financeSummary, speed } from "./emerald-model";
 import { clientGroupFinanceAssets } from "./client-latency-prices";
 import { RegionFlag } from "./ServerSymbols";
 import { layoutGlobeLabels } from "./globe-labels";
@@ -117,20 +117,19 @@ function Globe({ servers, visitorCountryCode }: { servers: ProbeServer[]; visito
   </div>;
 }
 export function fleetFinance(servers: ProbeServer[], assets: (Partial<ProbeServer> & { expiry_date?: string })[], now: number) {
-  const finance = financeSummary(servers, now).map(group => ({ ...group, clientEstimated: 0 }));
-  const clients = assets.filter(asset => {
-    const price = isNumber(asset.renewal_price_cny) ? asset.renewal_price_cny : asset.renewal_price;
-    return isNumber(price) && price > 0;
-  });
-  for (const client of financeSummary(clients, now, true)) {
-    if (!client.estimated) continue;
-    let group = finance.find(item => item.currency === client.currency);
+  const finance = financeSummary(servers, now);
+  for (const client of financeSummary(assets, now, true)) {
+    const group = finance.find(item => item.currency === client.currency);
     if (!group) {
-      group = { currency: client.currency, total: 0, monthly: 0, remaining: 0, priced: 0, periodic: 0, estimated: 0, clientEstimated: 0 };
-      finance.push(group);
+      finance.push(client);
+      continue;
     }
+    group.total += client.total;
+    group.monthly += client.monthly;
     group.remaining += client.remaining;
-    group.clientEstimated += client.estimated;
+    group.priced += client.priced;
+    group.periodic += client.periodic;
+    group.estimated += client.estimated;
   }
   return finance;
 }
@@ -146,7 +145,7 @@ export function FleetSummary({ servers, formatBytes, now = Date.now(), visitorCo
   const hasCumulative = cumulative.some(value => value !== undefined);
   const stats: { label: string; value: string; note: string; suffix?: string; icon: typeof Coins; title: string }[] = [
     { label: "内存用量", ...split(formatBytes(sum(memory.map(server => server.mem_used)))), suffix: `/ ${formatBytes(sum(memory.map(server => server.mem_total)))}`, icon: MemoryStick, title: "仅汇总在线且同时上报用量与总量的节点" },
-    { label: "剩余价值", value: (primary?.estimated || primary?.clientEstimated) ? `${primary.currency === "CNY" ? "¥" : ""}${primary.remaining.toFixed(2)}` : "—", note: primary?.currency || "", icon: Coins, title: "按价格、计费周期及到期时间估算；点击查看各币种，缺失字段不计入；不换汇" },
+    { label: "剩余价值", value: primary?.estimated ? `${primary.currency === "CNY" ? "¥" : ""}${primary.remaining.toFixed(2)}` : "—", note: primary?.currency || "", icon: Coins, title: "按价格、计费周期及到期时间估算；点击查看各币种，缺失字段不计入；不换汇" },
     { label: "实时上行", ...split(speed(sum(online.map(server => server.upload_speed)))), icon: ChevronUp, title: "在线节点已上报上行速率合计" },
     { label: "硬盘用量", ...split(formatBytes(sum(disks.map(server => server.disk_used)))), suffix: `/ ${formatBytes(sum(disks.map(server => server.disk_total)))}`, icon: HardDrive, title: "仅汇总在线且同时上报用量与总量的节点" },
     { label: hasCumulative ? "累计流量" : "计费流量", ...split(formatBytes(sum(hasCumulative ? cumulative : servers.map(billableTraffic)))), icon: Network, title: hasCumulative ? "已上报 cumulative_up + cumulative_down；各节点计数器复位时间可能不同" : "各节点自身计费周期用量合计；未上报累计计数，不冒充终身累计流量" },
@@ -160,8 +159,8 @@ export function FleetSummary({ servers, formatBytes, now = Date.now(), visitorCo
     })}</div>
     <dialog ref={financeDialog} className="finance-dialog" aria-label="节点价值" onClick={event => { if (event.target === event.currentTarget) financeDialog.current?.close(); }}>
       <div className="dialog-heading"><h2>节点价值</h2><button className="icon-button" aria-label="关闭节点价值" onClick={() => financeDialog.current?.close()}><X size={18} /></button></div>
-      {finance.length ? finance.map(group => <div className="finance-group" key={group.currency}><h3>{group.currency}</h3><dl><div><dt>总价值</dt><dd>{group.priced ? group.total.toFixed(2) : "—"}</dd></div><div><dt>月均支出</dt><dd>{group.periodic ? group.monthly.toFixed(2) : "—"}</dd></div><div><dt>剩余价值</dt><dd>{group.estimated || group.clientEstimated ? group.remaining.toFixed(2) : "—"}</dd></div></dl><p>{group.priced} 台已上报价格；{group.periodic} 台可折算月均；{group.estimated} 台服务器可估算剩余价值{group.clientEstimated > 0 && `；另有 ${group.clientEstimated} 项客户端资产计入剩余价值`}。</p></div>) : <p>尚无完整价格数据</p>}
-      <p className="telemetry-note">剩余价值包括已配置客户端资产；总价值和月均仅计服务器。各币种分别汇总，不换汇。月均按 30 天折算；剩余价值按计费周期和到期时间估算，仅有日期时按香港日历天数计算，非账单或可退款金额。</p>
+      {finance.length ? finance.map(group => <div className="finance-group" key={group.currency}><h3>{group.currency}</h3><dl><div><dt>总价值</dt><dd>{group.priced ? group.total.toFixed(2) : "—"}</dd></div><div><dt>月均支出</dt><dd>{group.periodic ? group.monthly.toFixed(2) : "—"}</dd></div><div><dt>剩余价值</dt><dd>{group.estimated ? group.remaining.toFixed(2) : "—"}</dd></div></dl><p>{group.priced} 项有价格；{group.periodic} 项可折算月均；{group.estimated} 项可估算剩余价值。</p></div>) : <p>尚无完整价格数据</p>}
+      <p className="telemetry-note">包括已配置客户端资产。各币种分别汇总，不换汇。月均按 30 天折算；剩余价值按计费周期和到期时间估算，仅有日期时按香港日历天数计算，非账单或可退款金额。</p>
     </dialog>
   </section>;
 }

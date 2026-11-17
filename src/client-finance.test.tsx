@@ -45,30 +45,50 @@ const free = financeSummary([{ ...assets[1], renewal_price_cny: 0 }], now, true)
 assert.equal(free.remaining, 0);
 const markup = renderToStaticMarkup(<FleetSummary servers={[server]} now={now} formatBytes={String} />);
 assert.ok(markup.includes(`¥${cny.remaining.toFixed(2)}`));
-assert.ok(markup.includes(`<dt>总价值</dt><dd>—</dd>`));
-assert.ok(markup.includes(`<dt>月均支出</dt><dd>—</dd>`));
+assert.ok(markup.includes(`<dt>总价值</dt><dd>200.00</dd>`));
+assert.ok(markup.includes(`<dt>月均支出</dt><dd>${cny.monthly.toFixed(2)}</dd>`));
 assert.ok(markup.includes(`<dt>剩余价值</dt><dd>${cny.remaining.toFixed(2)}</dd>`));
 assert.ok(markup.includes(`<h3>USD</h3>`));
 
 const cnyServer: ProbeServer = { online: true, renewal_price_cny: 365, renewal_cycle: "year", expires_at: "2027-11-11T16:00:00Z" };
 const combinedMarkup = renderToStaticMarkup(<FleetSummary servers={[cnyServer]} now={now} formatBytes={String} />);
-assert.ok(combinedMarkup.includes(`<dt>总价值</dt><dd>365.00</dd>`));
-assert.ok(combinedMarkup.includes(`<dt>月均支出</dt><dd>30.00</dd>`));
+assert.ok(combinedMarkup.includes(`<dt>总价值</dt><dd>565.00</dd>`));
+assert.ok(combinedMarkup.includes(`<dt>月均支出</dt><dd>${(30 + cny.monthly).toFixed(2)}</dd>`));
 assert.ok(combinedMarkup.includes(`<dt>剩余价值</dt><dd>${(2 + cny.remaining).toFixed(2)}</dd>`));
-assert.ok(combinedMarkup.includes("另有 2 项客户端资产计入剩余价值"));
+assert.ok(combinedMarkup.includes("3 项有价格；3 项可折算月均；3 项可估算剩余价值"));
 
 const foreignClient = { ...assets[0], renewal_price_cny: undefined, renewal_price: 365, renewal_currency: "USD" };
 const currencyGroups = fleetFinance([server], [foreignClient], now);
 assert.equal(currencyGroups.length, 1);
 assert.equal(currencyGroups[0].remaining, 3);
-assert.equal(currencyGroups[0].total, 365);
-assert.equal(currencyGroups[0].monthly, 30);
-assert.equal(currencyGroups[0].clientEstimated, 1);
-assert.equal(fleetFinance([], [{ ...foreignClient, renewal_price: 0 }], now).length, 0);
+assert.equal(currencyGroups[0].total, 730);
+assert.equal(currencyGroups[0].monthly, 60);
+assert.equal(currencyGroups[0].estimated, 2);
+assert.equal(fleetFinance([], [{ ...foreignClient, renewal_price: 0 }], now)[0].total, 0);
 assert.equal(fleetFinance([], [{ ...foreignClient, renewal_currency: undefined }], now).length, 0);
 
 const serverWithExtraDate = { ...server, expiry_date: "invalid" };
 assert.equal(fleetFinance([serverWithExtraDate], [], now)[0].remaining, 2);
 const usdBeforeCny = fleetFinance([server], assets, now);
 assert.equal(usdBeforeCny[0].currency, "USD");
-assert.equal(usdBeforeCny.find(group => group.currency === "CNY")?.clientEstimated, 2);
+assert.equal(usdBeforeCny.find(group => group.currency === "CNY")?.estimated, 2);
+
+const noExpiry = fleetFinance([], [{ ...assets[0], expires_at: undefined }], now)[0];
+assert.equal(noExpiry.total, 80);
+assert.equal(noExpiry.monthly, 80 * 30 / 365);
+assert.equal(noExpiry.estimated, 0);
+const expired = fleetFinance([], [assets[0]], Date.parse("2027-11-12T16:00:00Z"))[0];
+assert.equal(expired.total, 80);
+assert.equal(expired.monthly, 80 * 30 / 365);
+assert.equal(expired.remaining, 0);
+const invalid = fleetFinance([], [{ ...assets[0], renewal_price_cny: -1 }], now);
+assert.equal(invalid.length, 0);
+const permanent = fleetFinance([], [{ ...assets[0], renewal_cycle: "permanent" }], now)[0];
+assert.equal(permanent.total, 80);
+assert.equal(permanent.periodic, 0);
+assert.equal(permanent.estimated, 0);
+
+const observedPrice: ProbeServer = { online: true, renewal_price_cny: 109.98, renewal_cycle: "year", expires_at: "2027-03-17T00:00:00+08:00" };
+const actualAmounts = fleetFinance([observedPrice], assets, now)[0];
+assert.equal(actualAmounts.total.toFixed(2), "309.98");
+assert.equal(actualAmounts.monthly.toFixed(2), "25.48");
