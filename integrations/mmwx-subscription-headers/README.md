@@ -70,8 +70,10 @@ short-link locations pointing at the same legacy listener and preserve its
 exact secure-RPC location and named upstream, including their existing fallback.
 The wrapper handles those BWH exact paths via the original handler after
 reclassifying current short codes. Other methods under `/x/` are passed back to
-the panel. First check the current nginx configuration, existing location
-precedence and all referenced ports.
+the panel for the prefix location. Existing exact BWH locations still use the
+legacy handler for other methods, preserving their original behavior, even
+after a short code is reassigned. First check the current nginx configuration,
+existing location precedence and all referenced ports.
 
 Create private JSON outside Git with restricted permissions. Set the database and
 RPC-key paths from the existing deployment, the verified file identity and the

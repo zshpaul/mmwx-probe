@@ -159,6 +159,10 @@ class NginxFixtureTests(unittest.TestCase):
                 self.assertEqual(get("/x/ordinary", headers={"X-Fixture": "preserved"}), (200, "aggregate-fixture", None))
                 self.assertEqual(get("/x/dmit", "HEAD"), (200, "upload=2; download=3; total=20", None))
                 self.assertEqual(get("/x/dmit", "POST")[0], 204)
+                # The old exact BWH location continues to use the original
+                # legacy POST handler, outside the GET/HEAD change scope.
+                if os.environ.get("LEGACY_FIXTURE_PATH"):
+                    self.assertEqual(get("/x/bwh", "POST")[0], 404)
                 self.assertEqual(get("/x/ordinary?redirect=1"), (307, None, "/x/dmit"))
                 self.assertEqual(get("/x/dmit")[1], "upload=2; download=3; total=20")
                 for invalid in ("/%2578/dmit", "/%78/dmit", "/x/%2564mit", "/x/%64mit",
@@ -174,6 +178,8 @@ class NginxFixtureTests(unittest.TestCase):
                 fixture.db.commit()
                 self.assertEqual(get("/x/newbwh"), (200, bwh_header, None))
                 self.assertEqual(get("/x/bwh"), (200, "upload=2; download=3; total=20", None))
+                if os.environ.get("LEGACY_FIXTURE_PATH"):
+                    self.assertEqual(get("/x/bwh", "POST")[0], 404)
                 self.assertEqual(get("/x/dmit")[0], 404)
                 fixture.db.execute("UPDATE subscribe_files SET custom_short_code='bwh' WHERE id=3")
                 fixture.db.commit()

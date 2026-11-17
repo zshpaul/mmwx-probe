@@ -1,6 +1,6 @@
 # Adapt inside the existing target TLS server {} only after review.
-# Existing exact BWH /x/ locations must continue to point to the same 12890
-# listener, where the wrapper reclassifies the current identity each request.
+# Existing exact BWH /x/ locations continue to point to 12890. GET/HEAD are
+# dynamically classified; other methods retain the original legacy behavior.
 if ($mmwx_reject_subscription_uri) { return 400; }
 
 location ^~ /x/ {
