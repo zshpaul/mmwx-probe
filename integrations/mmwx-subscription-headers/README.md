@@ -12,6 +12,9 @@ subscription ID and filename, its separate external record and an explicitly
 approved HTTPS upstream hostname. Protected BWH IDs must be configured.
 Each upstream has an independent short cache; the upstream fields are parsed
 and validated, not scaled or replaced with fixed allowances.
+The optional per-mapping `profile_update_hours` replaces only that mapped
+subscription's `profile-update-interval` response header; it does not schedule
+requests or alter the BWH route. Omit it to preserve the panel header.
 
 | Case | Experimental behavior | Important limit |
 | --- | --- | --- |
