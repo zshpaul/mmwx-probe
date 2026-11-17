@@ -6,7 +6,7 @@ type ClientGroupPrice = Pick<ProbeServer, "renewal_price" | "renewal_price_cny" 
   expiry_date?: string;
 };
 
-export function clientGroupDateRemaining(date: string, now: number): PriceCard | undefined {
+export function clientGroupCalendarDays(date: string, now: number): number | undefined {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match || !Number.isFinite(now)) return undefined;
   const [, year, month, day] = match;
@@ -17,7 +17,12 @@ export function clientGroupDateRemaining(date: string, now: number): PriceCard |
   }).formatToParts(now);
   const part = (name: Intl.DateTimeFormatPartTypes) => Number(parts.find(item => item.type === name)?.value);
   const today = Date.UTC(part("year"), part("month") - 1, part("day"));
-  const days = (target - today) / 86400000;
+  return (target - today) / 86400000;
+}
+
+export function clientGroupDateRemaining(date: string, now: number): PriceCard | undefined {
+  const days = clientGroupCalendarDays(date, now);
+  if (days === undefined) return undefined;
   return {
     label: "剩余时间",
     value: days < 0 ? "已到期" : `${days} 天`,
@@ -53,4 +58,12 @@ const previewGroupPrices: Record<string, ClientGroupPrice> = {};
 
 export function clientGroupPrice(groupId: string, preview: boolean): ClientGroupPrice | undefined {
   return (preview ? previewGroupPrices[groupId] : undefined) ?? clientGroupPrices[groupId];
+}
+
+// Each configured client asset is counted once, independently of telemetry availability.
+export function clientGroupFinanceAssets(): ClientGroupPrice[] {
+  return [bwhUsGroupId, dmitUsGroupId].flatMap(id => {
+    const price = clientGroupPrice(id, false);
+    return price ? [price] : [];
+  });
 }
