@@ -13,12 +13,12 @@ type PingBar = { time?: number; latency?: number; loss?: number; tooltip?: strin
 export function PingSummaryLayout({ carrier, children, compact = false }: { carrier?: ReactNode; children?: ReactNode; compact?: boolean }) {
   return <div className={`emerald-ping${compact ? " compact" : ""}`}><div className="fact-row"><span>三网</span><i /><span className="carrier-values">{carrier}</span></div>{children}</div>;
 }
-export function PingPanels({ name, bars, latency, loss, onOpen, loading, error, client = false, latencyText, zeroMissing = false, clientFailureRate = false }: {
+export function PingPanels({ name, bars, latency, loss, onOpen, loading, error, client = false, latencyText, zeroMissing = false, clientFailureRate = false, latencyFailed = false }: {
   name: string; bars: PingBar[]; latency?: number; loss?: number; onOpen: () => void;
-  loading?: boolean; error?: string; client?: boolean; latencyText?: string; zeroMissing?: boolean; clientFailureRate?: boolean;
+  loading?: boolean; error?: string; client?: boolean; latencyText?: string; zeroMissing?: boolean; clientFailureRate?: boolean; latencyFailed?: boolean;
 }) {
   return <div className="ping-panels">{(["latency", "loss"] as const).map(metric => {
-    const label = metric === "latency" ? "延迟" : clientFailureRate ? "测速失败率" : "丢包";
+    const label = metric === "latency" ? latencyFailed ? "延迟 · 失败" : "延迟" : clientFailureRate ? "测速失败率" : "丢包";
     const value = metric === "latency" ? latency : loss;
     const unavailable = client && metric === "loss" && !clientFailureRate;
     const placeholder = zeroMissing && (unavailable || (value === undefined && !latencyText));

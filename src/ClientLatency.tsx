@@ -122,7 +122,7 @@ export function ClientLatencySummary({ group, onOpen, now = Date.now(), zeroMiss
   const padded = [...Array.from({ length: 10 - recent.length }, () => ({})), ...recent];
   return <PingSummaryLayout>
     <PingPanels name={group.alias} bars={healthEnabled && !health.fresh ? padded.map(() => ({})) : padded} latency={(!healthEnabled || health.fresh) && latest?.status === "ok" ? latest.delay_ms ?? undefined : undefined} loss={healthEnabled ? health.failureRate : undefined} zeroMissing={healthEnabled ? false : zeroMissing}
-      latencyText={healthEnabled && latest && !health.fresh ? "已过期" : !healthEnabled && latest?.status === "failed" ? "测速失败" : undefined} client clientFailureRate={healthEnabled} onOpen={onOpen} />
+      latencyText={healthEnabled && latest && !health.fresh ? "已过期" : !healthEnabled && latest?.status === "failed" ? "测速失败" : undefined} client clientFailureRate={healthEnabled} latencyFailed={healthEnabled && health.fresh && latest?.status === "failed"} onOpen={onOpen} />
   </PingSummaryLayout>;
 }
 
